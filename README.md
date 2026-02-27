@@ -114,7 +114,6 @@ sudo yum install wqy-zenhei-fonts
 ## 项目结构
 
 ```
-astrbot_plugin_bazaar/
 ├── main.py              # 插件主代码（指令处理器）
 ├── card_renderer.py     # 图片卡片渲染器（Pillow）
 ├── metadata.yaml        # AstrBot 插件元数据

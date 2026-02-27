@@ -12,23 +12,18 @@
 
 ## 项目结构
 ```
-astrbot_plugin_bazaar/     # 插件主目录（可直接复制到 AstrBot 插件目录使用）
-├── main.py                # 插件主代码（9个指令处理器）
+├── main.py                # 插件主代码（指令处理器）
 ├── card_renderer.py       # 图片卡片渲染器（Pillow生成PNG卡片）
 ├── metadata.yaml          # 插件元数据
 ├── requirements.txt       # 依赖 (Pillow, aiohttp)
 ├── README.md              # 项目说明
 ├── LICENSE                # MIT 许可证
-├── .gitignore             # Git 忽略规则
+├── logo.png               # 插件 Logo
 └── data/
     ├── items_db.json      # 物品数据库 (958条)
     ├── monsters_db.json   # 怪物数据库 (120条)
     ├── skills_db.json     # 技能数据库 (448条)
     └── cache/             # 图片缓存目录（自动创建）
-
-astrbot/                   # AstrBot API Mock（仅用于本地测试）
-app.py                     # 交互式测试入口
-test_plugin.py             # 自动化测试脚本
 ```
 
 ## 支持的指令
