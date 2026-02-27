@@ -1,1 +1,13 @@
 .idea
+__pycache__/
+*.pyc
+data/cache/
+tests/
+.local/
+.cache/
+.pythonlibs/
+.upm/
+.replit
+pyproject.toml
+uv.lock
+replit.md

@@ -50,7 +50,10 @@ class BazaarPlugin(Star):
     async def initialize(self):
         self._load_data()
         try:
-            from .card_renderer import CardRenderer
+            try:
+                from .card_renderer import CardRenderer
+            except ImportError:
+                from card_renderer import CardRenderer
             self.renderer = CardRenderer(self.plugin_dir)
             logger.info("图片卡片渲染器已加载")
         except Exception as e:

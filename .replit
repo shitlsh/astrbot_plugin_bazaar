@@ -18,12 +18,12 @@ args = "Start application"
 name = "Start application"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python app.py"
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python tests/app.py"
 
 [nix]
 channel = "stable-25_05"
