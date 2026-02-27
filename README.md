@@ -1,7 +1,7 @@
 # astrbot_plugin_bazaar
 
 <p align="center">
-  <img src="astrbot_plugin_bazaar/logo.png" alt="Bazaar Plugin Logo" width="200">
+  <img src="logo.png" alt="Bazaar Plugin Logo" width="200">
 </p>
 
 <p align="center">
