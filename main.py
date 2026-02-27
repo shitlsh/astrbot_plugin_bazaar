@@ -55,13 +55,27 @@ def _resolve_search(results, query, name_func, not_found_msg):
         return None, not_found_msg
     if len(results) == 1:
         return results[0], None
-    exact = [r for r in results if query in name_func(r)]
+    exact = [r for r in results if query.lower() in name_func(r).lower()]
     if len(exact) == 1:
         return exact[0], None
     display = exact[:15] if exact else results[:15]
     total = len(exact) if exact else len(results)
     names = [f"  {name_func(r)}" for r in display]
     return None, f"找到{total}个匹配结果，请精确输入:\n" + "\n".join(names)
+
+
+def _edit_distance(s1: str, s2: str) -> int:
+    if len(s1) < len(s2):
+        return _edit_distance(s2, s1)
+    if len(s2) == 0:
+        return len(s1)
+    prev = list(range(len(s2) + 1))
+    for i, c1 in enumerate(s1):
+        curr = [i + 1]
+        for j, c2 in enumerate(s2):
+            curr.append(min(prev[j + 1] + 1, curr[j] + 1, prev[j] + (0 if c1 == c2 else 1)))
+        prev = curr
+    return prev[len(s2)]
 
 
 def _extract_query(message_str: str, command_name: str) -> str:
@@ -251,6 +265,8 @@ class BazaarPlugin(Star):
             "- 当用户提到任何可能是游戏内容的名词时（如物品名、怪物名、英雄名），优先使用工具查询，不要凭空编造信息\n"
             "- 当用户问「怎么搭配」「怎么玩」「推荐阵容」时，使用 bazaar_query_build 工具\n"
             "- 当用户问某个东西「是什么」「有什么效果」时，先用 bazaar_query_item 查询\n"
+            "- 工具返回的是纯文本信息。如果用户想看图片卡片，建议他们使用 /tbzitem、/tbzmonster、/tbzskill 等命令\n"
+            "- 在回复中整合工具返回的数据，并在末尾告知用户可以使用对应命令查看图片版本\n"
             "- 用中文回复玩家，语气友好专业\n"
             "- 游戏中的英雄包括：Dooley(杜利/鸡煲)、Jules(朱尔斯/厨子)、Mak(马克)、Pygmalien(皮格马利翁/猪猪)、Stelle(斯黛拉/黑妹)、Vanessa(瓦妮莎/海盗) 等\n"
             "- 物品品质分为：Bronze(铜/青铜)、Silver(银)、Gold(金/黄金)、Diamond(钻石)\n"
@@ -711,6 +727,59 @@ class BazaarPlugin(Star):
 
         return "\n".join(lines)
 
+    def _fuzzy_suggest(self, query: str, limit: int = 8) -> list:
+        kw = query.lower()
+        if len(kw) < 2:
+            return []
+        threshold = max(1, len(kw) // 3)
+        candidates = []
+        all_entries = []
+        for item in self.items:
+            cn = item.get("name_cn", "")
+            en = item.get("name_en", "")
+            all_entries.append((cn, en, f"📦 {cn}({en})"))
+        for key, monster in self.monsters.items():
+            cn = monster.get("name_zh", key)
+            en = monster.get("name", "")
+            all_entries.append((cn, en, f"🐉 {cn}({en})"))
+        for skill in self.skills:
+            cn = skill.get("name_cn", "")
+            en = skill.get("name_en", "")
+            all_entries.append((cn, en, f"⚡ {cn}({en})"))
+        for ev in self.events:
+            cn = ev.get("name", "")
+            en = ev.get("name_en", "")
+            all_entries.append((cn, en, f"🎲 {cn}({en})"))
+        for cn, en, display in all_entries:
+            best_dist = None
+            for name in [cn, en]:
+                if not name:
+                    continue
+                nl = name.lower()
+                if kw in nl or nl in kw:
+                    best_dist = 0
+                    break
+                if abs(len(nl) - len(kw)) > threshold:
+                    continue
+                dist = _edit_distance(kw, nl)
+                if dist <= threshold:
+                    if best_dist is None or dist < best_dist:
+                        best_dist = dist
+            if best_dist is not None:
+                candidates.append((best_dist, display))
+        candidates.sort(key=lambda x: x[0])
+        return [c[1] for c in candidates[:limit]]
+
+    def _not_found_with_suggestions(self, query: str, entity_type: str) -> str:
+        suggestions = self._fuzzy_suggest(query)
+        msg = f"未找到{entity_type}「{query}」。"
+        if suggestions:
+            msg += "\n\n🔍 你可能在找:\n" + "\n".join(f"  {s}" for s in suggestions)
+            msg += "\n\n💡 请使用精确名称重新查询，或使用 /tbzsearch 搜索。"
+        else:
+            msg += "\n💡 请使用 /tbzsearch 搜索。"
+        return msg
+
     def _search_events(self, keyword: str) -> list:
         results = []
         kw = keyword.lower()
@@ -837,7 +906,7 @@ class BazaarPlugin(Star):
                 return f"{m.get('name_zh', k)}({m.get('name', '')})"
             found, msg = _resolve_search(
                 results, query, monster_name,
-                f"未找到怪物「{query}」，请使用 /tbzsearch 搜索。"
+                self._not_found_with_suggestions(query, "怪物")
             )
             if msg:
                 yield event.plain_result(msg)
@@ -910,7 +979,7 @@ class BazaarPlugin(Star):
                         return
 
         if not found:
-            yield event.plain_result(f"未找到物品「{query}」，请使用 /tbzsearch 搜索。")
+            yield event.plain_result(self._not_found_with_suggestions(query, "物品"))
             return
 
         if self.renderer:
@@ -946,7 +1015,7 @@ class BazaarPlugin(Star):
                 return f"{r.get('name_cn', '')}({r.get('name_en', '')})"
             found, msg = _resolve_search(
                 results, query, skill_name,
-                f"未找到技能「{query}」，请使用 /tbzsearch 搜索。"
+                self._not_found_with_suggestions(query, "技能")
             )
             if msg:
                 yield event.plain_result(msg)
@@ -985,7 +1054,7 @@ class BazaarPlugin(Star):
                 return f"{r.get('name', '')}({r.get('name_en', '')})"
             found, msg = _resolve_search(
                 results, query, event_name,
-                f"未找到事件「{query}」。可用事件共 {len(self.events)} 个。"
+                self._not_found_with_suggestions(query, "事件")
             )
             if msg:
                 yield event.plain_result(msg)
@@ -1609,10 +1678,12 @@ class BazaarPlugin(Star):
                 return
 
         if not found:
-            yield event.plain_result(f"未找到物品「{item_name}」。")
+            yield event.plain_result(self._not_found_with_suggestions(item_name, "物品"))
             return
 
-        yield event.plain_result(self._format_item_info(found))
+        info = self._format_item_info(found)
+        info += "\n\n💡 使用 /tbzitem " + (found.get("name_cn") or found.get("name_en", "")) + " 可查看图片卡片"
+        yield event.plain_result(info)
 
     @filter.llm_tool(name="bazaar_query_monster")
     async def tool_query_monster(self, event: AstrMessageEvent, monster_name: str):
@@ -1640,13 +1711,16 @@ class BazaarPlugin(Star):
                 k, m = r
                 return f"{m.get('name_zh', k)}({m.get('name', '')})"
             found, msg = _resolve_search(results, query, monster_name_fn,
-                f"未找到怪物「{monster_name}」。")
+                self._not_found_with_suggestions(monster_name, "怪物"))
             if msg:
                 yield event.plain_result(msg)
                 return
             found_key, found_monster = found
 
-        yield event.plain_result(self._format_monster_info(found_key, found_monster))
+        info = self._format_monster_info(found_key, found_monster)
+        name = found_monster.get("name_zh") or found_monster.get("name", found_key)
+        info += "\n\n💡 使用 /tbzmonster " + name + " 可查看图片卡片"
+        yield event.plain_result(info)
 
     @filter.llm_tool(name="bazaar_query_skill")
     async def tool_query_skill(self, event: AstrMessageEvent, skill_name: str):
@@ -1670,12 +1744,14 @@ class BazaarPlugin(Star):
             def skill_name_fn(r):
                 return f"{r.get('name_cn', '')}({r.get('name_en', '')})"
             found, msg = _resolve_search(results, query, skill_name_fn,
-                f"未找到技能「{skill_name}」。")
+                self._not_found_with_suggestions(skill_name, "技能"))
             if msg:
                 yield event.plain_result(msg)
                 return
 
-        yield event.plain_result(self._format_skill_info(found))
+        info = self._format_skill_info(found)
+        info += "\n\n💡 使用 /tbzskill " + (found.get("name_cn") or found.get("name_en", "")) + " 可查看图片卡片"
+        yield event.plain_result(info)
 
     @filter.llm_tool(name="bazaar_query_event")
     async def tool_query_event(self, event: AstrMessageEvent, event_name: str):
@@ -1699,7 +1775,7 @@ class BazaarPlugin(Star):
             def ev_name_fn(r):
                 return f"{r.get('name', '')}({r.get('name_en', '')})"
             found, msg = _resolve_search(results, query, ev_name_fn,
-                f"未找到事件「{event_name}」。")
+                self._not_found_with_suggestions(event_name, "事件"))
             if msg:
                 yield event.plain_result(msg)
                 return
