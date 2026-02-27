@@ -51,6 +51,13 @@
 - 工具返回纯文本格式（非图片），供 AI 整合到回复中
 - 复用现有的 `_resolve_alias()`, `_search_*()`, `_filter_*()`, `_translate_build_query()` 等方法
 
+## AI 人格预设
+- `_register_persona()` 在 `initialize()` 中调用，通过 `self.context.persona_manager` 注册
+- persona_id: `bazaar_helper`，包含游戏背景、英雄列表、工具使用规则的系统提示词
+- begin_dialogs: 2 条开场对话（user/assistant 交替）
+- tools: 绑定 5 个 bazaar_* 工具，确保人格模式下优先调用
+- 幂等注册：已存在则 update_persona，不存在则 create_persona
+
 ## 别名与配置系统
 - 使用 AstrBot 的 `_conf_schema.json` 配置体系，别名可通过 AstrBot 管理面板直接编辑
 - 配置项: `hero_aliases`, `item_aliases`, `monster_aliases`, `skill_aliases`, `tag_aliases`, `tier_aliases`, `size_aliases`（均为 dict 类型）

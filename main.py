@@ -96,7 +96,7 @@ CONFIG_KEY_MAP = {
 }
 
 
-@register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、阵容查询，图片卡片展示，AI 自动调用", "v1.0.4")
+@register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、阵容查询，图片卡片展示，AI 人格预设与工具自动调用", "v1.0.5")
 class BazaarPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
@@ -217,10 +217,71 @@ class BazaarPlugin(Star):
         except Exception as e:
             logger.warning(f"图片渲染器加载失败，将使用纯文本模式: {e}")
             self.renderer = None
+        await self._register_persona()
         logger.info(
             f"Bazaar 插件加载完成: {len(self.monsters)} 个怪物, "
             f"{len(self.items)} 个物品, {len(self.skills)} 个技能"
         )
+
+    async def _register_persona(self):
+        PERSONA_ID = "bazaar_helper"
+        SYSTEM_PROMPT = (
+            "你是「大巴扎小助手」，一个专门为 The Bazaar (大巴扎) 卡牌游戏提供帮助的 AI 助手。\n"
+            "The Bazaar 是由 Tempo Storm 开发的 Roguelike 卡牌对战游戏（也叫大巴扎、巴扎）。\n\n"
+            "你的职责：\n"
+            "1. 帮助玩家查询游戏中的物品、怪物、技能信息\n"
+            "2. 为玩家推荐阵容搭配和策略\n"
+            "3. 解答游戏机制和玩法问题\n\n"
+            "你拥有以下工具来查询游戏数据：\n"
+            "- bazaar_query_item: 查询物品详情（属性、技能、附魔、任务等）\n"
+            "- bazaar_query_monster: 查询怪物详情（血量、技能、掉落等）\n"
+            "- bazaar_query_skill: 查询技能详情（描述、适用英雄等）\n"
+            "- bazaar_search: 多条件搜索物品/怪物/技能\n"
+            "- bazaar_query_build: 查询社区推荐阵容\n\n"
+            "重要规则：\n"
+            "- 当用户提到任何可能是游戏内容的名词时（如物品名、怪物名、英雄名），优先使用工具查询，不要凭空编造信息\n"
+            "- 当用户问「怎么搭配」「怎么玩」「推荐阵容」时，使用 bazaar_query_build 工具\n"
+            "- 当用户问某个东西「是什么」「有什么效果」时，先用 bazaar_query_item 查询\n"
+            "- 用中文回复玩家，语气友好专业\n"
+            "- 游戏中的英雄包括：Dooley(杜利/鸡煲)、Jules(朱尔斯/厨子)、Mak(马克)、Pygmalien(皮格马利翁/猪猪)、Stelle(斯黛拉/黑妹)、Vanessa(瓦妮莎/海盗) 等\n"
+            "- 物品品质分为：Bronze(铜/青铜)、Silver(银)、Gold(金/黄金)、Diamond(钻石)\n"
+            "- 物品有不同尺寸：Small(小型)、Medium(中型)、Large(大型)"
+        )
+        BEGIN_DIALOGS = [
+            "你好！我想了解一下 The Bazaar 这个游戏",
+            "你好！我是大巴扎小助手，专门帮助玩家查询 The Bazaar 游戏的物品、怪物、技能信息，以及推荐阵容搭配。你可以直接问我任何关于游戏的问题，比如「船锚怎么搭配」「放大镜是什么效果」「有哪些黄金武器」等。有什么我能帮你的吗？",
+        ]
+        TOOLS = [
+            "bazaar_query_item",
+            "bazaar_query_monster",
+            "bazaar_query_skill",
+            "bazaar_search",
+            "bazaar_query_build",
+        ]
+        try:
+            pm = self.context.persona_manager
+            try:
+                existing = pm.get_persona(PERSONA_ID)
+                if existing:
+                    pm.update_persona(
+                        persona_id=PERSONA_ID,
+                        system_prompt=SYSTEM_PROMPT,
+                        begin_dialogs=BEGIN_DIALOGS,
+                        tools=TOOLS,
+                    )
+                    logger.info("已更新「大巴扎小助手」人格预设")
+                    return
+            except (ValueError, Exception):
+                pass
+            pm.create_persona(
+                persona_id=PERSONA_ID,
+                system_prompt=SYSTEM_PROMPT,
+                begin_dialogs=BEGIN_DIALOGS,
+                tools=TOOLS,
+            )
+            logger.info("已创建「大巴扎小助手」人格预设")
+        except Exception as e:
+            logger.warning(f"人格预设注册失败（不影响插件使用）: {e}")
 
     def _build_vocab(self):
         vocab = {}
