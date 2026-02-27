@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import html as html_module
 from pathlib import Path
 
@@ -11,7 +12,6 @@ from astrbot.api import logger
 
 BUILDS_API = "https://bazaar-builds.net/wp-json/wp/v2"
 DEFAULT_BUILD_COUNT = 3
-
 
 TIER_EMOJI = {"Bronze": "🥉", "Silver": "🥈", "Gold": "🥇", "Diamond": "💎"}
 
@@ -37,6 +37,24 @@ def _get_skill_text(skill_entry) -> str:
     return str(skill_entry)
 
 
+def _strip_html(text: str) -> str:
+    return re.sub(r'<[^>]+>', '', text).strip()
+
+
+def _resolve_search(results, query, name_func, not_found_msg):
+    if not results:
+        return None, not_found_msg
+    if len(results) == 1:
+        return results[0], None
+    exact = [r for r in results if query in name_func(r)]
+    if len(exact) == 1:
+        return exact[0], None
+    display = exact[:15] if exact else results[:15]
+    total = len(exact) if exact else len(results)
+    names = [f"  {name_func(r)}" for r in display]
+    return None, f"找到{total}个匹配结果，请精确输入:\n" + "\n".join(names)
+
+
 @register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、阵容查询，图片卡片展示", "v1.0.0")
 class BazaarPlugin(Star):
     def __init__(self, context: Context):
@@ -46,6 +64,12 @@ class BazaarPlugin(Star):
         self.skills = []
         self.plugin_dir = Path(os.path.dirname(os.path.abspath(__file__)))
         self.renderer = None
+        self._session: aiohttp.ClientSession | None = None
+
+    async def _get_session(self) -> aiohttp.ClientSession:
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20))
+        return self._session
 
     async def initialize(self):
         self._load_data()
@@ -54,7 +78,8 @@ class BazaarPlugin(Star):
                 from .card_renderer import CardRenderer
             except ImportError:
                 from card_renderer import CardRenderer
-            self.renderer = CardRenderer(self.plugin_dir)
+            session = await self._get_session()
+            self.renderer = CardRenderer(self.plugin_dir, session)
             logger.info("图片卡片渲染器已加载")
         except Exception as e:
             logger.warning(f"图片渲染器加载失败，将使用纯文本模式: {e}")
@@ -416,17 +441,17 @@ class BazaarPlugin(Star):
 
         if not found_monster:
             results = self._search_monsters(query)
-            if len(results) == 1:
-                found_key, found_monster = results[0]
-            elif len(results) > 1:
-                names = [f"  {m.get('name_zh', k)}({m.get('name', '')})" for k, m in results[:15]]
-                yield event.plain_result(
-                    f"找到{len(results)}个匹配结果，请精确输入:\n" + "\n".join(names)
-                )
+            def monster_name(r):
+                k, m = r
+                return f"{m.get('name_zh', k)}({m.get('name', '')})"
+            found, msg = _resolve_search(
+                results, query, monster_name,
+                f"未找到怪物「{query}」，请使用 /bzsearch 搜索。"
+            )
+            if msg:
+                yield event.plain_result(msg)
                 return
-            else:
-                yield event.plain_result(f"未找到怪物「{query}」，请使用 /bzsearch 搜索。")
-                return
+            found_key, found_monster = found
 
         if self.renderer:
             try:
@@ -456,19 +481,14 @@ class BazaarPlugin(Star):
 
         if not found:
             results = self._search_items(query)
-            exact = [it for it in results
-                     if query in it.get("name_cn", "") or query in it.get("name_en", "")]
-            if len(exact) == 1:
-                found = exact[0]
-            elif len(results) == 1:
-                found = results[0]
-            elif len(results) > 1:
-                display = exact[:15] if exact else results[:15]
-                names = [f"  {it.get('name_cn', '')}({it.get('name_en', '')})" for it in display]
-                total = len(exact) if exact else len(results)
-                yield event.plain_result(
-                    f"找到{total}个匹配结果，请精确输入:\n" + "\n".join(names)
-                )
+            def item_name(r):
+                return f"{r.get('name_cn', '')}({r.get('name_en', '')})"
+            found, msg = _resolve_search(
+                results, query, item_name,
+                None
+            )
+            if msg:
+                yield event.plain_result(msg)
                 return
 
         if not found:
@@ -529,24 +549,15 @@ class BazaarPlugin(Star):
 
         if not found:
             results = self._search_skills(query)
-            exact = [sk for sk in results
-                     if query in sk.get("name_cn", "") or query in sk.get("name_en", "")]
-            if len(exact) == 1:
-                found = exact[0]
-            elif len(results) == 1:
-                found = results[0]
-            elif len(results) > 1:
-                display = exact[:15] if exact else results[:15]
-                names = [f"  {sk.get('name_cn', '')}({sk.get('name_en', '')})" for sk in display]
-                total = len(exact) if exact else len(results)
-                yield event.plain_result(
-                    f"找到{total}个匹配结果，请精确输入:\n" + "\n".join(names)
-                )
+            def skill_name(r):
+                return f"{r.get('name_cn', '')}({r.get('name_en', '')})"
+            found, msg = _resolve_search(
+                results, query, skill_name,
+                f"未找到技能「{query}」，请使用 /bzsearch 搜索。"
+            )
+            if msg:
+                yield event.plain_result(msg)
                 return
-
-        if not found:
-            yield event.plain_result(f"未找到技能「{query}」，请使用 /bzsearch 搜索。")
-            return
 
         if self.renderer:
             try:
@@ -751,10 +762,10 @@ class BazaarPlugin(Star):
 
     async def _download_image(self, url: str) -> bytes | None:
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=20)) as resp:
-                    if resp.status == 200:
-                        return await resp.read()
+            session = await self._get_session()
+            async with session.get(url) as resp:
+                if resp.status == 200:
+                    return await resp.read()
         except Exception as e:
             logger.debug(f"图片下载失败: {url}: {e}")
         return None
@@ -767,46 +778,44 @@ class BazaarPlugin(Star):
             "_fields": "id,title,link,date,excerpt,featured_media",
         }
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                    if resp.status != 200:
-                        return []
-                    posts = await resp.json()
+            session = await self._get_session()
+            async with session.get(url, params=params) as resp:
+                if resp.status != 200:
+                    return []
+                posts = await resp.json()
 
-                builds = []
-                for post in posts:
-                    title = html_module.unescape(post.get("title", {}).get("rendered", ""))
-                    excerpt_html = post.get("excerpt", {}).get("rendered", "")
-                    excerpt_text = html_module.unescape(
-                        excerpt_html.replace("<p>", "").replace("</p>", "").replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
-                    ).strip()
+            builds = []
+            for post in posts:
+                title = html_module.unescape(post.get("title", {}).get("rendered", ""))
+                excerpt_raw = post.get("excerpt", {}).get("rendered", "")
+                excerpt_text = html_module.unescape(_strip_html(excerpt_raw))
 
-                    image_url = ""
-                    media_id = post.get("featured_media", 0)
-                    if media_id:
-                        media_url = f"{BUILDS_API}/media/{media_id}?_fields=source_url,media_details"
-                        try:
-                            async with session.get(media_url, timeout=aiohttp.ClientTimeout(total=10)) as mresp:
-                                if mresp.status == 200:
-                                    media = await mresp.json()
-                                    sizes = media.get("media_details", {}).get("sizes", {})
-                                    for size_key in ("large", "medium_large", "1536x1536", "medium"):
-                                        if size_key in sizes:
-                                            image_url = sizes[size_key]["source_url"]
-                                            break
-                                    if not image_url:
-                                        image_url = media.get("source_url", "")
-                        except Exception:
-                            pass
+                image_url = ""
+                media_id = post.get("featured_media", 0)
+                if media_id:
+                    media_url = f"{BUILDS_API}/media/{media_id}?_fields=source_url,media_details"
+                    try:
+                        async with session.get(media_url) as mresp:
+                            if mresp.status == 200:
+                                media = await mresp.json()
+                                sizes = media.get("media_details", {}).get("sizes", {})
+                                for size_key in ("large", "medium_large", "1536x1536", "medium"):
+                                    if size_key in sizes:
+                                        image_url = sizes[size_key]["source_url"]
+                                        break
+                                if not image_url:
+                                    image_url = media.get("source_url", "")
+                    except Exception:
+                        pass
 
-                    builds.append({
-                        "title": title,
-                        "link": post.get("link", ""),
-                        "date": post.get("date", "")[:10],
-                        "excerpt": excerpt_text[:200],
-                        "image_url": image_url,
-                    })
-                return builds
+                builds.append({
+                    "title": title,
+                    "link": post.get("link", ""),
+                    "date": post.get("date", "")[:10],
+                    "excerpt": excerpt_text[:200],
+                    "image_url": image_url,
+                })
+            return builds
         except Exception as e:
             logger.warning(f"查询阵容失败: {e}")
             return []
@@ -876,4 +885,6 @@ class BazaarPlugin(Star):
         )
 
     async def terminate(self):
+        if self._session and not self._session.closed:
+            await self._session.close()
         logger.info("Bazaar 插件已卸载")

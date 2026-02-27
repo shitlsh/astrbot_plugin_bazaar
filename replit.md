@@ -50,6 +50,14 @@
 - 默认返回3条结果，用户可指定1-10条
 - API端点: `https://bazaar-builds.net/wp-json/wp/v2/posts?search=...`
 
+## 架构要点
+- 持久化 aiohttp.ClientSession：在 `initialize()` 创建，`terminate()` 关闭，main.py 和 card_renderer.py 共享
+- HTML 清理使用 `re.sub(r'<[^>]+>', '', text)` 正则替换
+- 搜索校验逻辑提取为通用 `_resolve_search()` 辅助函数
+- `_wrap_text()` 对中文逐字换行，英文按词换行，避免截断单词
+- card_renderer.py 中所有布局数值提取为模块级常量（PADDING, LINE_HEIGHT_* 等）
+- `@register` 装饰器保留用于兼容旧版 AstrBot，新版会自动识别 Star 子类
+
 ## 技术栈
 - Python 3.11
 - Pillow (图片生成)

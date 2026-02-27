@@ -1,5 +1,6 @@
 import io
 import os
+import re
 import hashlib
 import aiohttp
 from pathlib import Path
@@ -42,6 +43,42 @@ TIER_COLORS = {
     "Diamond": COLORS["tier_diamond"],
 }
 
+CARD_WIDTH = 520
+BUILD_CARD_WIDTH = 560
+PADDING = 20
+HEADER_RADIUS = 12
+BADGE_RADIUS = 4
+TAG_RADIUS = 4
+
+LINE_HEIGHT_TITLE = 34
+LINE_HEIGHT_SUBTITLE = 22
+LINE_HEIGHT_BODY = 22
+LINE_HEIGHT_SMALL = 18
+LINE_HEIGHT_LINK = 16
+LINE_HEIGHT_EXCERPT = 17
+LINE_HEIGHT_DETAIL = 22
+LINE_HEIGHT_STAT = 22
+LINE_HEIGHT_ITEM = 26
+LINE_HEIGHT_SKILL = 26
+
+SECTION_GAP = 10
+INDENT = 10
+INDENT_DEEP = 20
+DESC_GAP = 4
+SKILL_DESC_GAP = 6
+THUMB_SIZE = 64
+THUMB_MARGIN = 76
+
+FONT_SIZE_TITLE = 28
+FONT_SIZE_TITLE_SMALL = 26
+FONT_SIZE_SUBTITLE = 18
+FONT_SIZE_BODY = 16
+FONT_SIZE_SMALL = 14
+FONT_SIZE_TAG = 13
+FONT_SIZE_LINK = 12
+
+_CJK_RANGES = re.compile(r'[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]')
+
 
 def _clean_tier(raw: str) -> str:
     if not raw:
@@ -56,8 +93,9 @@ def _get_skill_text(skill_entry) -> str:
 
 
 class CardRenderer:
-    def __init__(self, plugin_dir: Path):
+    def __init__(self, plugin_dir: Path, session: aiohttp.ClientSession | None = None):
         self.plugin_dir = plugin_dir
+        self._session = session
         self.cache_dir = plugin_dir / "data" / "cache"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self._font_path = None
@@ -80,6 +118,12 @@ class CardRenderer:
             return ImageFont.truetype(self._font_path, size)
         return ImageFont.load_default()
 
+    async def _get_session(self) -> aiohttp.ClientSession:
+        if self._session is not None and not self._session.closed:
+            return self._session
+        self._session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15))
+        return self._session
+
     async def _fetch_image(self, url: str) -> Image.Image | None:
         cache_name = hashlib.md5(url.encode()).hexdigest() + ".webp"
         cache_path = self.cache_dir / cache_name
@@ -91,13 +135,13 @@ class CardRenderer:
                 pass
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                    if resp.status == 200:
-                        data = await resp.read()
-                        with open(cache_path, "wb") as f:
-                            f.write(data)
-                        return Image.open(io.BytesIO(data)).convert("RGBA")
+            session = await self._get_session()
+            async with session.get(url) as resp:
+                if resp.status == 200:
+                    data = await resp.read()
+                    with open(cache_path, "wb") as f:
+                        f.write(data)
+                    return Image.open(io.BytesIO(data)).convert("RGBA")
         except Exception as e:
             logger.debug(f"获取图片失败: {url}: {e}")
         return None
@@ -108,37 +152,67 @@ class CardRenderer:
             if not paragraph.strip():
                 lines.append("")
                 continue
-            current = ""
-            for char in paragraph:
-                test = current + char
-                bbox = font.getbbox(test)
-                w = bbox[2] - bbox[0]
-                if w > max_width and current:
+            has_cjk = bool(_CJK_RANGES.search(paragraph))
+            if has_cjk:
+                current = ""
+                for char in paragraph:
+                    test = current + char
+                    bbox = font.getbbox(test)
+                    w = bbox[2] - bbox[0]
+                    if w > max_width and current:
+                        lines.append(current)
+                        current = char
+                    else:
+                        current = test
+                if current:
                     lines.append(current)
-                    current = char
-                else:
-                    current = test
-            if current:
-                lines.append(current)
+            else:
+                words = paragraph.split(" ")
+                current = ""
+                for word in words:
+                    test = f"{current} {word}" if current else word
+                    bbox = font.getbbox(test)
+                    w = bbox[2] - bbox[0]
+                    if w > max_width and current:
+                        lines.append(current)
+                        current = word
+                    else:
+                        current = test
+                if current:
+                    lines.append(current)
         return lines
 
     def _draw_rounded_rect(self, draw: ImageDraw.ImageDraw, xy, radius, fill):
-        x0, y0, x1, y1 = xy
         draw.rounded_rectangle(xy, radius=radius, fill=fill)
+
+    def _draw_divider(self, draw, y, card_width):
+        draw.line((PADDING, y, card_width - PADDING, y), fill=COLORS["divider"], width=1)
+
+    def _draw_tier_badge(self, draw, tier_raw, tier_clean, y, card_width, font_tag):
+        tier_color = TIER_COLORS.get(tier_clean, COLORS["text_dim"])
+        tier_badge = f" {tier_raw} "
+        bbox = font_tag.getbbox(tier_badge)
+        tw = bbox[2] - bbox[0] + 12
+        badge_x = card_width - PADDING - tw
+        draw.rounded_rectangle(
+            (badge_x, y + SECTION_GAP, badge_x + tw, y + 28), radius=BADGE_RADIUS, fill=tier_color
+        )
+        draw.text(
+            (badge_x + 6, y + 11), tier_badge.strip(), font=font_tag,
+            fill=COLORS["bg"] if tier_clean in ("Gold", "Diamond") else COLORS["text"]
+        )
 
     async def render_monster_card(self, key: str, monster: dict) -> bytes:
         name_zh = monster.get("name_zh", key)
         name_en = monster.get("name", "")
 
-        font_title = self._font(28)
-        font_subtitle = self._font(18)
-        font_body = self._font(16)
-        font_small = self._font(14)
-        font_tag = self._font(13)
+        font_title = self._font(FONT_SIZE_TITLE)
+        font_subtitle = self._font(FONT_SIZE_SUBTITLE)
+        font_body = self._font(FONT_SIZE_BODY)
+        font_small = self._font(FONT_SIZE_SMALL)
+        font_tag = self._font(FONT_SIZE_TAG)
 
-        card_width = 520
-        padding = 20
-        content_width = card_width - padding * 2
+        content_width = CARD_WIDTH - PADDING * 2
 
         sections = []
 
@@ -166,13 +240,13 @@ class CardRenderer:
             if parts:
                 info_lines.append(f"奖励: {' | '.join(parts)}")
         if info_lines:
-            sections.append(("info", 20 + len(info_lines) * 22))
+            sections.append(("info", PADDING + len(info_lines) * LINE_HEIGHT_DETAIL))
 
         skills = monster.get("skills", [])
         if skills:
             skill_height = 30
             for s in skills[:6]:
-                skill_height += 26
+                skill_height += LINE_HEIGHT_SKILL
                 tiers = s.get("tiers", {})
                 if tiers:
                     current = s.get("current_tier", "").lower()
@@ -181,9 +255,9 @@ class CardRenderer:
                     )
                     if tier_data and tier_data.get("description"):
                         for desc in tier_data["description"][:2]:
-                            wrapped = self._wrap_text(desc, font_small, content_width - 30)
-                            skill_height += len(wrapped) * 18
-                        skill_height += 4
+                            wrapped = self._wrap_text(desc, font_small, content_width - INDENT_DEEP - INDENT)
+                            skill_height += len(wrapped) * LINE_HEIGHT_SMALL
+                        skill_height += DESC_GAP
             sections.append(("skills", skill_height))
 
         items = monster.get("items", [])
@@ -197,7 +271,7 @@ class CardRenderer:
                     unique_items.append(it)
             item_height = 30
             for it in unique_items[:6]:
-                item_height += 26
+                item_height += LINE_HEIGHT_ITEM
                 tiers = it.get("tiers", {})
                 if tiers:
                     current = it.get("current_tier", "").lower()
@@ -206,27 +280,27 @@ class CardRenderer:
                     )
                     if tier_data and tier_data.get("description"):
                         desc = tier_data["description"][0]
-                        wrapped = self._wrap_text(desc, font_small, content_width - 30)
-                        item_height += len(wrapped) * 18
-                        item_height += 4
+                        wrapped = self._wrap_text(desc, font_small, content_width - INDENT_DEEP - INDENT)
+                        item_height += len(wrapped) * LINE_HEIGHT_SMALL
+                        item_height += DESC_GAP
             if len(unique_items) > 6:
-                item_height += 22
+                item_height += LINE_HEIGHT_DETAIL
             sections.append(("items", item_height))
 
-        total_height = sum(h for _, h in sections) + padding * 2 + (len(sections) - 1) * 10 + 20
-        img = Image.new("RGBA", (card_width, total_height), COLORS["bg"])
+        total_height = sum(h for _, h in sections) + PADDING * 2 + (len(sections) - 1) * SECTION_GAP + PADDING
+        img = Image.new("RGBA", (CARD_WIDTH, total_height), COLORS["bg"])
         draw = ImageDraw.Draw(img)
 
-        y = padding
+        y = PADDING
 
-        self._draw_rounded_rect(draw, (0, 0, card_width, header_height + padding), 12, COLORS["header_bg"])
+        self._draw_rounded_rect(draw, (0, 0, CARD_WIDTH, header_height + PADDING), HEADER_RADIUS, COLORS["header_bg"])
 
         if monster_img:
-            thumb = monster_img.resize((64, 64), Image.LANCZOS)
-            img.paste(thumb, (padding, y + 8), thumb)
-            text_x = padding + 76
+            thumb = monster_img.resize((THUMB_SIZE, THUMB_SIZE), Image.LANCZOS)
+            img.paste(thumb, (PADDING, y + 8), thumb)
+            text_x = PADDING + THUMB_MARGIN
         else:
-            text_x = padding
+            text_x = PADDING
 
         draw.text((text_x, y + 8), name_zh, font=font_title, fill=COLORS["text"])
         draw.text((text_x, y + 42), name_en, font=font_subtitle, fill=COLORS["text_dim"])
@@ -237,15 +311,15 @@ class CardRenderer:
             for tag in tags[:4]:
                 bbox = font_tag.getbbox(tag)
                 tw = bbox[2] - bbox[0] + 12
-                if tag_x + tw > card_width - padding:
+                if tag_x + tw > CARD_WIDTH - PADDING:
                     break
                 draw.rounded_rectangle(
-                    (tag_x, y + 64, tag_x + tw, y + 82), radius=4, fill=COLORS["divider"]
+                    (tag_x, y + 64, tag_x + tw, y + 82), radius=TAG_RADIUS, fill=COLORS["divider"]
                 )
                 draw.text((tag_x + 6, y + 65), tag, font=font_tag, fill=COLORS["accent"])
                 tag_x += tw + 6
 
-        y = header_height + padding + 10
+        y = header_height + PADDING + SECTION_GAP
 
         for section_name, section_height in sections:
             if section_name == "header":
@@ -253,27 +327,27 @@ class CardRenderer:
 
             if section_name == "info":
                 for line in info_lines:
-                    draw.text((padding, y), line, font=font_body, fill=COLORS["text_dim"])
-                    y += 22
-                draw.line((padding, y, card_width - padding, y), fill=COLORS["divider"], width=1)
-                y += 10
+                    draw.text((PADDING, y), line, font=font_body, fill=COLORS["text_dim"])
+                    y += LINE_HEIGHT_DETAIL
+                self._draw_divider(draw, y, CARD_WIDTH)
+                y += SECTION_GAP
 
             elif section_name == "skills":
-                draw.text((padding, y), "⚔ 技能", font=font_subtitle, fill=COLORS["accent"])
-                y += 28
+                draw.text((PADDING, y), "⚔ 技能", font=font_subtitle, fill=COLORS["accent"])
+                y += LINE_HEIGHT_SUBTITLE + SECTION_GAP
                 for s in skills[:6]:
                     name = s.get("name", s.get("name_en", ""))
                     tier_str = s.get("tier", s.get("current_tier", ""))
                     tier_clean = _clean_tier(tier_str)
                     tier_color = TIER_COLORS.get(tier_clean, COLORS["text_dim"])
-                    draw.text((padding + 8, y), f"● {name}", font=font_body, fill=tier_color)
+                    draw.text((PADDING + 8, y), f"● {name}", font=font_body, fill=tier_color)
                     bbox = font_body.getbbox(f"● {name}")
                     name_w = bbox[2] - bbox[0]
                     draw.text(
-                        (padding + 8 + name_w + 8, y + 2), f"[{tier_str}]",
+                        (PADDING + 8 + name_w + 8, y + 2), f"[{tier_str}]",
                         font=font_small, fill=COLORS["text_dim"]
                     )
-                    y += 26
+                    y += LINE_HEIGHT_SKILL
                     tiers = s.get("tiers", {})
                     if tiers:
                         current = s.get("current_tier", "").lower()
@@ -282,16 +356,16 @@ class CardRenderer:
                         )
                         if tier_data and tier_data.get("description"):
                             for desc in tier_data["description"][:2]:
-                                for wl in self._wrap_text(desc, font_small, content_width - 30):
-                                    draw.text((padding + 20, y), wl, font=font_small, fill=COLORS["text_dim"])
-                                    y += 18
-                            y += 4
-                draw.line((padding, y, card_width - padding, y), fill=COLORS["divider"], width=1)
-                y += 10
+                                for wl in self._wrap_text(desc, font_small, content_width - INDENT_DEEP - INDENT):
+                                    draw.text((PADDING + INDENT_DEEP, y), wl, font=font_small, fill=COLORS["text_dim"])
+                                    y += LINE_HEIGHT_SMALL
+                            y += DESC_GAP
+                self._draw_divider(draw, y, CARD_WIDTH)
+                y += SECTION_GAP
 
             elif section_name == "items":
-                draw.text((padding, y), "🎒 物品", font=font_subtitle, fill=COLORS["green"])
-                y += 28
+                draw.text((PADDING, y), "🎒 物品", font=font_subtitle, fill=COLORS["green"])
+                y += LINE_HEIGHT_SUBTITLE + SECTION_GAP
                 seen2 = set()
                 count = 0
                 for it in items:
@@ -303,23 +377,23 @@ class CardRenderer:
                     if count > 6:
                         remaining = len(set(i.get("id", i.get("name", "")) for i in items)) - 6
                         draw.text(
-                            (padding + 8, y), f"... 还有{remaining}个物品",
+                            (PADDING + 8, y), f"... 还有{remaining}个物品",
                             font=font_small, fill=COLORS["text_dim"]
                         )
-                        y += 22
+                        y += LINE_HEIGHT_DETAIL
                         break
                     name = it.get("name", "")
                     tier_str = it.get("tier", it.get("current_tier", ""))
                     tier_clean = _clean_tier(tier_str)
                     tier_color = TIER_COLORS.get(tier_clean, COLORS["text_dim"])
-                    draw.text((padding + 8, y), f"● {name}", font=font_body, fill=tier_color)
+                    draw.text((PADDING + 8, y), f"● {name}", font=font_body, fill=tier_color)
                     bbox = font_body.getbbox(f"● {name}")
                     name_w = bbox[2] - bbox[0]
                     draw.text(
-                        (padding + 8 + name_w + 8, y + 2), f"[{tier_str}]",
+                        (PADDING + 8 + name_w + 8, y + 2), f"[{tier_str}]",
                         font=font_small, fill=COLORS["text_dim"]
                     )
-                    y += 26
+                    y += LINE_HEIGHT_ITEM
                     tiers_data = it.get("tiers", {})
                     if tiers_data:
                         current = it.get("current_tier", "").lower()
@@ -328,10 +402,10 @@ class CardRenderer:
                         )
                         if tier_data and tier_data.get("description"):
                             desc = tier_data["description"][0]
-                            for wl in self._wrap_text(desc, font_small, content_width - 30):
-                                draw.text((padding + 20, y), wl, font=font_small, fill=COLORS["text_dim"])
-                                y += 18
-                            y += 4
+                            for wl in self._wrap_text(desc, font_small, content_width - INDENT_DEEP - INDENT):
+                                draw.text((PADDING + INDENT_DEEP, y), wl, font=font_small, fill=COLORS["text_dim"])
+                                y += LINE_HEIGHT_SMALL
+                            y += DESC_GAP
 
         buf = io.BytesIO()
         img.save(buf, format="PNG")
@@ -343,15 +417,13 @@ class CardRenderer:
         tier_raw = item.get("starting_tier", "")
         tier_clean = _clean_tier(tier_raw)
 
-        font_title = self._font(26)
-        font_subtitle = self._font(18)
-        font_body = self._font(16)
-        font_small = self._font(14)
-        font_tag = self._font(13)
+        font_title = self._font(FONT_SIZE_TITLE_SMALL)
+        font_subtitle = self._font(FONT_SIZE_SUBTITLE)
+        font_body = self._font(FONT_SIZE_BODY)
+        font_small = self._font(FONT_SIZE_SMALL)
+        font_tag = self._font(FONT_SIZE_TAG)
 
-        card_width = 520
-        padding = 20
-        content_width = card_width - padding * 2
+        content_width = CARD_WIDTH - PADDING * 2
 
         item_img = await self._fetch_image(
             f"{GITHUB_RAW}/images/{item.get('id', '')}.webp"
@@ -366,19 +438,19 @@ class CardRenderer:
         passive_skills = item.get("skills_passive", [])
         skills_h = 0
         if active_skills:
-            skills_h += 28
+            skills_h += LINE_HEIGHT_SUBTITLE + SECTION_GAP
             for sk in active_skills[:4]:
                 txt = _get_skill_text(sk)
-                wrapped = self._wrap_text(txt, font_small, content_width - 20)
-                skills_h += len(wrapped) * 18 + 6
+                wrapped = self._wrap_text(txt, font_small, content_width - INDENT_DEEP)
+                skills_h += len(wrapped) * LINE_HEIGHT_SMALL + SKILL_DESC_GAP
         if passive_skills:
-            skills_h += 28
+            skills_h += LINE_HEIGHT_SUBTITLE + SECTION_GAP
             for sk in passive_skills[:4]:
                 txt = _get_skill_text(sk)
-                wrapped = self._wrap_text(txt, font_small, content_width - 20)
-                skills_h += len(wrapped) * 18 + 6
+                wrapped = self._wrap_text(txt, font_small, content_width - INDENT_DEEP)
+                skills_h += len(wrapped) * LINE_HEIGHT_SMALL + SKILL_DESC_GAP
         if skills_h:
-            sections_height += skills_h + 10
+            sections_height += skills_h + SECTION_GAP
 
         details = []
         hero_str = item.get("heroes", "")
@@ -395,7 +467,7 @@ class CardRenderer:
         if item.get("available_tiers"):
             details.append(f"品质: {item['available_tiers']}")
         if details:
-            sections_height += len(details) * 22 + 10
+            sections_height += len(details) * LINE_HEIGHT_DETAIL + SECTION_GAP
 
         stat_fields = [
             ("damage", "damage_tiers", "伤害"),
@@ -416,118 +488,107 @@ class CardRenderer:
             if val and val != 0:
                 stats.append((label, val, tiers_str))
         if stats:
-            sections_height += 28 + len(stats) * 22 + 10
+            sections_height += LINE_HEIGHT_SUBTITLE + SECTION_GAP + len(stats) * LINE_HEIGHT_STAT + SECTION_GAP
 
         enchantments = item.get("enchantments", {})
         ench_list = []
         if enchantments and isinstance(enchantments, dict):
             ench_list = list(enchantments.items())[:6]
-            ench_h = 28
+            ench_h = LINE_HEIGHT_SUBTITLE + SECTION_GAP
             for ench_key, ench_data in ench_list:
                 if isinstance(ench_data, dict):
                     effect = ench_data.get("effect_cn", ench_data.get("effect_en", ""))
-                    wrapped = self._wrap_text(effect, font_small, content_width - 20)
-                    ench_h += 20 + len(wrapped) * 18
+                    wrapped = self._wrap_text(effect, font_small, content_width - INDENT_DEEP)
+                    ench_h += PADDING + len(wrapped) * LINE_HEIGHT_SMALL
             if len(enchantments) > 6:
-                ench_h += 20
-            sections_height += ench_h + 10
+                ench_h += PADDING
+            sections_height += ench_h + SECTION_GAP
 
-        total_height = sections_height + padding * 2 + 20
-        img = Image.new("RGBA", (card_width, total_height), COLORS["bg"])
+        total_height = sections_height + PADDING * 2 + PADDING
+        img = Image.new("RGBA", (CARD_WIDTH, total_height), COLORS["bg"])
         draw = ImageDraw.Draw(img)
 
-        y = padding
+        y = PADDING
 
-        tier_color = TIER_COLORS.get(tier_clean, COLORS["text_dim"])
-        self._draw_rounded_rect(draw, (0, 0, card_width, header_h + padding), 12, COLORS["header_bg"])
+        self._draw_rounded_rect(draw, (0, 0, CARD_WIDTH, header_h + PADDING), HEADER_RADIUS, COLORS["header_bg"])
 
         if item_img:
-            thumb = item_img.resize((64, 64), Image.LANCZOS)
-            img.paste(thumb, (padding, y + 8), thumb)
-            text_x = padding + 76
+            thumb = item_img.resize((THUMB_SIZE, THUMB_SIZE), Image.LANCZOS)
+            img.paste(thumb, (PADDING, y + 8), thumb)
+            text_x = PADDING + THUMB_MARGIN
         else:
-            text_x = padding
+            text_x = PADDING
 
         draw.text((text_x, y + 8), name_cn, font=font_title, fill=COLORS["text"])
         draw.text((text_x, y + 38), name_en, font=font_subtitle, fill=COLORS["text_dim"])
 
-        tier_badge = f" {tier_raw} "
-        bbox = font_tag.getbbox(tier_badge)
-        tw = bbox[2] - bbox[0] + 12
-        badge_x = card_width - padding - tw
-        draw.rounded_rectangle(
-            (badge_x, y + 10, badge_x + tw, y + 28), radius=4, fill=tier_color
-        )
-        draw.text(
-            (badge_x + 6, y + 11), tier_badge.strip(), font=font_tag,
-            fill=COLORS["bg"] if tier_clean in ("Gold", "Diamond") else COLORS["text"]
-        )
+        self._draw_tier_badge(draw, tier_raw, tier_clean, y, CARD_WIDTH, font_tag)
 
-        y = header_h + padding + 10
+        y = header_h + PADDING + SECTION_GAP
 
         if active_skills:
-            draw.text((padding, y), "⚔ 主动技能", font=font_subtitle, fill=COLORS["accent"])
-            y += 28
+            draw.text((PADDING, y), "⚔ 主动技能", font=font_subtitle, fill=COLORS["accent"])
+            y += LINE_HEIGHT_SUBTITLE + SECTION_GAP
             for sk in active_skills[:4]:
                 txt = _get_skill_text(sk)
-                for wl in self._wrap_text(txt, font_small, content_width - 20):
-                    draw.text((padding + 10, y), wl, font=font_small, fill=COLORS["text"])
-                    y += 18
-                y += 6
+                for wl in self._wrap_text(txt, font_small, content_width - INDENT_DEEP):
+                    draw.text((PADDING + INDENT, y), wl, font=font_small, fill=COLORS["text"])
+                    y += LINE_HEIGHT_SMALL
+                y += SKILL_DESC_GAP
 
         if passive_skills:
-            draw.text((padding, y), "🛡 被动技能", font=font_subtitle, fill=COLORS["purple"])
-            y += 28
+            draw.text((PADDING, y), "🛡 被动技能", font=font_subtitle, fill=COLORS["purple"])
+            y += LINE_HEIGHT_SUBTITLE + SECTION_GAP
             for sk in passive_skills[:4]:
                 txt = _get_skill_text(sk)
-                for wl in self._wrap_text(txt, font_small, content_width - 20):
-                    draw.text((padding + 10, y), wl, font=font_small, fill=COLORS["text"])
-                    y += 18
-                y += 6
+                for wl in self._wrap_text(txt, font_small, content_width - INDENT_DEEP):
+                    draw.text((PADDING + INDENT, y), wl, font=font_small, fill=COLORS["text"])
+                    y += LINE_HEIGHT_SMALL
+                y += SKILL_DESC_GAP
 
         if active_skills or passive_skills:
-            draw.line((padding, y, card_width - padding, y), fill=COLORS["divider"], width=1)
-            y += 10
+            self._draw_divider(draw, y, CARD_WIDTH)
+            y += SECTION_GAP
 
         if details:
             for d in details:
-                draw.text((padding, y), d, font=font_small, fill=COLORS["text_dim"])
-                y += 22
-            draw.line((padding, y, card_width - padding, y), fill=COLORS["divider"], width=1)
-            y += 10
+                draw.text((PADDING, y), d, font=font_small, fill=COLORS["text_dim"])
+                y += LINE_HEIGHT_DETAIL
+            self._draw_divider(draw, y, CARD_WIDTH)
+            y += SECTION_GAP
 
         if stats:
-            draw.text((padding, y), "📈 数值", font=font_subtitle, fill=COLORS["orange"])
-            y += 28
+            draw.text((PADDING, y), "📈 数值", font=font_subtitle, fill=COLORS["orange"])
+            y += LINE_HEIGHT_SUBTITLE + SECTION_GAP
             for label, val, tiers_str in stats:
                 val_text = f"{label}: {val}"
-                draw.text((padding + 10, y), val_text, font=font_body, fill=COLORS["text"])
+                draw.text((PADDING + INDENT, y), val_text, font=font_body, fill=COLORS["text"])
                 if tiers_str:
                     bbox = font_body.getbbox(val_text)
                     vw = bbox[2] - bbox[0]
                     draw.text(
-                        (padding + 10 + vw + 8, y + 2), f"({tiers_str})",
+                        (PADDING + INDENT + vw + 8, y + 2), f"({tiers_str})",
                         font=font_small, fill=COLORS["text_dim"]
                     )
-                y += 22
-            draw.line((padding, y, card_width - padding, y), fill=COLORS["divider"], width=1)
-            y += 10
+                y += LINE_HEIGHT_STAT
+            self._draw_divider(draw, y, CARD_WIDTH)
+            y += SECTION_GAP
 
         if ench_list:
-            draw.text((padding, y), f"✨ 附魔 ({len(enchantments)}种)", font=font_subtitle, fill=COLORS["pink"])
-            y += 28
+            draw.text((PADDING, y), f"✨ 附魔 ({len(enchantments)}种)", font=font_subtitle, fill=COLORS["pink"])
+            y += LINE_HEIGHT_SUBTITLE + SECTION_GAP
             for ench_key, ench_data in ench_list:
                 if isinstance(ench_data, dict):
                     ench_cn = ench_data.get("name_cn", ench_key)
-                    draw.text((padding + 10, y), f"● {ench_cn}({ench_key})", font=font_body, fill=COLORS["gold"])
-                    y += 20
+                    draw.text((PADDING + INDENT, y), f"● {ench_cn}({ench_key})", font=font_body, fill=COLORS["gold"])
+                    y += PADDING
                     effect = ench_data.get("effect_cn", ench_data.get("effect_en", ""))
-                    for wl in self._wrap_text(effect, font_small, content_width - 20):
-                        draw.text((padding + 22, y), wl, font=font_small, fill=COLORS["text_dim"])
-                        y += 18
+                    for wl in self._wrap_text(effect, font_small, content_width - INDENT_DEEP):
+                        draw.text((PADDING + INDENT_DEEP + 2, y), wl, font=font_small, fill=COLORS["text_dim"])
+                        y += LINE_HEIGHT_SMALL
             if len(enchantments) > 6:
                 draw.text(
-                    (padding + 10, y), f"... 还有{len(enchantments) - 6}种附魔",
+                    (PADDING + INDENT, y), f"... 还有{len(enchantments) - 6}种附魔",
                     font=font_small, fill=COLORS["text_dim"]
                 )
 
@@ -541,27 +602,25 @@ class CardRenderer:
         tier_raw = skill.get("starting_tier", "")
         tier_clean = _clean_tier(tier_raw)
 
-        font_title = self._font(26)
-        font_subtitle = self._font(18)
-        font_body = self._font(16)
-        font_small = self._font(14)
-        font_tag = self._font(13)
+        font_title = self._font(FONT_SIZE_TITLE_SMALL)
+        font_subtitle = self._font(FONT_SIZE_SUBTITLE)
+        font_body = self._font(FONT_SIZE_BODY)
+        font_small = self._font(FONT_SIZE_SMALL)
+        font_tag = self._font(FONT_SIZE_TAG)
 
-        card_width = 520
-        padding = 20
-        content_width = card_width - padding * 2
+        content_width = CARD_WIDTH - PADDING * 2
 
         header_h = 70
-        body_h = 20
+        body_h = PADDING
 
         desc_cn = skill.get("description_cn", "")
         desc_en = skill.get("description_en", "")
         if desc_cn:
             wrapped = self._wrap_text(desc_cn, font_body, content_width)
-            body_h += len(wrapped) * 22 + 10
+            body_h += len(wrapped) * LINE_HEIGHT_BODY + SECTION_GAP
         if desc_en:
             wrapped = self._wrap_text(desc_en, font_small, content_width)
-            body_h += len(wrapped) * 18 + 10
+            body_h += len(wrapped) * LINE_HEIGHT_SMALL + SECTION_GAP
 
         details = []
         hero_str = skill.get("heroes", "")
@@ -577,71 +636,62 @@ class CardRenderer:
         if skill.get("hidden_tags"):
             details.append(f"隐藏标签: {skill['hidden_tags']}")
         if details:
-            body_h += len(details) * 22 + 10
+            body_h += len(details) * LINE_HEIGHT_DETAIL + SECTION_GAP
 
         descriptions = skill.get("descriptions", [])
         if descriptions and len(descriptions) > 1:
-            body_h += 28
+            body_h += LINE_HEIGHT_SUBTITLE + SECTION_GAP
             for desc in descriptions[:4]:
                 cn = desc.get("cn", "")
                 if cn:
-                    wrapped = self._wrap_text(cn, font_small, content_width - 20)
-                    body_h += len(wrapped) * 18 + 4
+                    wrapped = self._wrap_text(cn, font_small, content_width - INDENT_DEEP)
+                    body_h += len(wrapped) * LINE_HEIGHT_SMALL + DESC_GAP
 
-        total_height = header_h + body_h + padding * 3
-        img = Image.new("RGBA", (card_width, total_height), COLORS["bg"])
+        total_height = header_h + body_h + PADDING * 3
+        img = Image.new("RGBA", (CARD_WIDTH, total_height), COLORS["bg"])
         draw = ImageDraw.Draw(img)
 
-        y = padding
-        tier_color = TIER_COLORS.get(tier_clean, COLORS["text_dim"])
-        self._draw_rounded_rect(draw, (0, 0, card_width, header_h + padding), 12, COLORS["header_bg"])
+        y = PADDING
+        self._draw_rounded_rect(draw, (0, 0, CARD_WIDTH, header_h + PADDING), HEADER_RADIUS, COLORS["header_bg"])
 
-        draw.text((padding, y + 8), name_cn, font=font_title, fill=COLORS["text"])
-        draw.text((padding, y + 40), name_en, font=font_subtitle, fill=COLORS["text_dim"])
+        draw.text((PADDING, y + 8), name_cn, font=font_title, fill=COLORS["text"])
+        draw.text((PADDING, y + 40), name_en, font=font_subtitle, fill=COLORS["text_dim"])
 
-        tier_badge = f" {tier_raw} "
-        bbox = font_tag.getbbox(tier_badge)
-        tw = bbox[2] - bbox[0] + 12
-        badge_x = card_width - padding - tw
-        draw.rounded_rectangle((badge_x, y + 10, badge_x + tw, y + 28), radius=4, fill=tier_color)
-        draw.text(
-            (badge_x + 6, y + 11), tier_badge.strip(), font=font_tag,
-            fill=COLORS["bg"] if tier_clean in ("Gold", "Diamond") else COLORS["text"]
-        )
+        self._draw_tier_badge(draw, tier_raw, tier_clean, y, CARD_WIDTH, font_tag)
 
-        y = header_h + padding + 10
+        y = header_h + PADDING + SECTION_GAP
 
         if desc_cn:
             for wl in self._wrap_text(desc_cn, font_body, content_width):
-                draw.text((padding, y), wl, font=font_body, fill=COLORS["text"])
-                y += 22
-            y += 10
+                draw.text((PADDING, y), wl, font=font_body, fill=COLORS["text"])
+                y += LINE_HEIGHT_BODY
+            y += SECTION_GAP
         if desc_en:
             for wl in self._wrap_text(desc_en, font_small, content_width):
-                draw.text((padding, y), wl, font=font_small, fill=COLORS["text_dim"])
-                y += 18
-            y += 10
+                draw.text((PADDING, y), wl, font=font_small, fill=COLORS["text_dim"])
+                y += LINE_HEIGHT_SMALL
+            y += SECTION_GAP
 
-        draw.line((padding, y, card_width - padding, y), fill=COLORS["divider"], width=1)
-        y += 10
+        self._draw_divider(draw, y, CARD_WIDTH)
+        y += SECTION_GAP
 
         if details:
             for d in details:
-                draw.text((padding, y), d, font=font_small, fill=COLORS["text_dim"])
-                y += 22
-            draw.line((padding, y, card_width - padding, y), fill=COLORS["divider"], width=1)
-            y += 10
+                draw.text((PADDING, y), d, font=font_small, fill=COLORS["text_dim"])
+                y += LINE_HEIGHT_DETAIL
+            self._draw_divider(draw, y, CARD_WIDTH)
+            y += SECTION_GAP
 
         if descriptions and len(descriptions) > 1:
-            draw.text((padding, y), "📋 各品质描述", font=font_subtitle, fill=COLORS["purple"])
-            y += 28
+            draw.text((PADDING, y), "📋 各品质描述", font=font_subtitle, fill=COLORS["purple"])
+            y += LINE_HEIGHT_SUBTITLE + SECTION_GAP
             for desc in descriptions[:4]:
                 cn = desc.get("cn", "")
                 if cn:
-                    for wl in self._wrap_text(cn, font_small, content_width - 20):
-                        draw.text((padding + 10, y), wl, font=font_small, fill=COLORS["text"])
-                        y += 18
-                    y += 4
+                    for wl in self._wrap_text(cn, font_small, content_width - INDENT_DEEP):
+                        draw.text((PADDING + INDENT, y), wl, font=font_small, fill=COLORS["text"])
+                        y += LINE_HEIGHT_SMALL
+                    y += DESC_GAP
 
         buf_skill = io.BytesIO()
         img.save(buf_skill, format="PNG")
@@ -649,91 +699,89 @@ class CardRenderer:
 
     async def render_build_card(self, query: str, search_term: str, builds: list) -> bytes:
         font_title = self._font(24)
-        font_subtitle = self._font(18)
+        font_subtitle = self._font(FONT_SIZE_SUBTITLE)
         font_body = self._font(15)
-        font_small = self._font(13)
-        font_link = self._font(12)
+        font_small = self._font(FONT_SIZE_TAG)
+        font_link = self._font(FONT_SIZE_LINK)
 
-        card_width = 560
-        padding = 20
-        content_width = card_width - padding * 2
+        content_width = BUILD_CARD_WIDTH - PADDING * 2
 
         header_h = 60
         body_h = 0
 
         for build in builds:
             bh = 0
-            title_lines = self._wrap_text(build["title"], font_subtitle, content_width - 10)
-            bh += len(title_lines) * 22
-            bh += 20
+            title_lines = self._wrap_text(build["title"], font_subtitle, content_width - INDENT)
+            bh += len(title_lines) * LINE_HEIGHT_SUBTITLE
+            bh += PADDING
             if build.get("excerpt"):
-                excerpt_lines = self._wrap_text(build["excerpt"], font_small, content_width - 10)
-                bh += len(excerpt_lines) * 17
-                bh += 6
-            bh += 18
-            bh += 16
+                excerpt_lines = self._wrap_text(build["excerpt"], font_small, content_width - INDENT)
+                bh += len(excerpt_lines) * LINE_HEIGHT_EXCERPT
+                bh += SKILL_DESC_GAP
+            bh += LINE_HEIGHT_SMALL
+            bh += LINE_HEIGHT_LINK
             body_h += bh
 
-        body_h += (len(builds) - 1) * 10
+        body_h += (len(builds) - 1) * SECTION_GAP
         footer_h = 30
 
-        total_height = header_h + body_h + footer_h + padding * 3
-        img = Image.new("RGBA", (card_width, total_height), COLORS["bg"])
+        total_height = header_h + body_h + footer_h + PADDING * 3
+        img = Image.new("RGBA", (BUILD_CARD_WIDTH, total_height), COLORS["bg"])
         draw = ImageDraw.Draw(img)
 
-        y = padding
-        self._draw_rounded_rect(draw, (0, 0, card_width, header_h + padding), 12, COLORS["header_bg"])
+        y = PADDING
+        self._draw_rounded_rect(draw, (0, 0, BUILD_CARD_WIDTH, header_h + PADDING), HEADER_RADIUS, COLORS["header_bg"])
 
         title_text = f"🏗️ 「{query}」推荐阵容"
-        draw.text((padding, y + 6), title_text, font=font_title, fill=COLORS["text"])
+        draw.text((PADDING, y + 6), title_text, font=font_title, fill=COLORS["text"])
         sub = f"来源: bazaar-builds.net | 共{len(builds)}条结果"
         if search_term != query:
             sub = f"搜索: {search_term} | " + sub
-        draw.text((padding, y + 34), sub, font=font_small, fill=COLORS["text_dim"])
+        draw.text((PADDING, y + 34), sub, font=font_small, fill=COLORS["text_dim"])
 
-        y = header_h + padding + 10
+        y = header_h + PADDING + SECTION_GAP
 
         for i, build in enumerate(builds):
             num_badge = f" {i + 1} "
             bbox = font_body.getbbox(num_badge)
-            bw = bbox[2] - bbox[0] + 10
+            bw = bbox[2] - bbox[0] + INDENT
             draw.rounded_rectangle(
-                (padding, y, padding + bw, y + 22), radius=4, fill=COLORS["accent"]
+                (PADDING, y, PADDING + bw, y + LINE_HEIGHT_SUBTITLE), radius=BADGE_RADIUS, fill=COLORS["accent"]
             )
-            draw.text((padding + 5, y + 2), num_badge.strip(), font=font_body, fill=COLORS["bg"])
+            draw.text((PADDING + 5, y + 2), num_badge.strip(), font=font_body, fill=COLORS["bg"])
 
-            title_x = padding + bw + 8
-            title_lines = self._wrap_text(build["title"], font_subtitle, content_width - bw - 10)
+            title_x = PADDING + bw + 8
+            title_lines = self._wrap_text(build["title"], font_subtitle, content_width - bw - INDENT)
             for j, tl in enumerate(title_lines):
-                draw.text((title_x if j == 0 else padding + 10, y), tl, font=font_subtitle, fill=COLORS["text"])
-                y += 22
+                draw.text((title_x if j == 0 else PADDING + INDENT, y), tl, font=font_subtitle, fill=COLORS["text"])
+                y += LINE_HEIGHT_SUBTITLE
 
-            y += 4
-            draw.text((padding + 10, y), f"📅 {build['date']}", font=font_small, fill=COLORS["text_dim"])
-            y += 16
+            y += DESC_GAP
+            draw.text((PADDING + INDENT, y), f"📅 {build['date']}", font=font_small, fill=COLORS["text_dim"])
+            y += LINE_HEIGHT_LINK
 
             if build.get("excerpt"):
-                excerpt_lines = self._wrap_text(build["excerpt"], font_small, content_width - 10)
+                excerpt_lines = self._wrap_text(build["excerpt"], font_small, content_width - INDENT)
                 for el in excerpt_lines:
-                    draw.text((padding + 10, y), el, font=font_small, fill=COLORS["text_dim"])
-                    y += 17
-                y += 6
+                    draw.text((PADDING + INDENT, y), el, font=font_small, fill=COLORS["text_dim"])
+                    y += LINE_HEIGHT_EXCERPT
+                y += SKILL_DESC_GAP
 
-            draw.text((padding + 10, y), f"🔗 {build['link']}", font=font_link, fill=COLORS["accent"])
-            y += 18
+            draw.text((PADDING + INDENT, y), f"🔗 {build['link']}", font=font_link, fill=COLORS["accent"])
+            y += LINE_HEIGHT_SMALL
 
             if i < len(builds) - 1:
-                y += 4
-                draw.line((padding + 10, y, card_width - padding - 10, y), fill=COLORS["divider"], width=1)
-                y += 6
+                y += DESC_GAP
+                self._draw_divider(draw, y, BUILD_CARD_WIDTH)
+                y += SKILL_DESC_GAP
 
-        y += 10
+        y += SECTION_GAP
         more_url = f"https://bazaar-builds.net/?s={search_term.replace(' ', '+')}"
         more_text = f"💡 更多阵容: {more_url}"
         more_lines = self._wrap_text(more_text, font_link, content_width)
         for ml in more_lines:
-            draw.text((padding, y), ml, font=font_link, fill=COLORS["green"])
-            y += 16
+            draw.text((PADDING, y), ml, font=font_link, fill=COLORS["green"])
+            y += LINE_HEIGHT_LINK
 
         buf_build = io.BytesIO()
         img.save(buf_build, format="PNG")
