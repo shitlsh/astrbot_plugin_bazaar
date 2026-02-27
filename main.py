@@ -96,6 +96,7 @@ class BazaarPlugin(Star):
 
     async def initialize(self):
         self._load_data()
+        self._build_vocab()
         try:
             try:
                 from .card_renderer import CardRenderer
@@ -111,6 +112,74 @@ class BazaarPlugin(Star):
             f"Bazaar 插件加载完成: {len(self.monsters)} 个怪物, "
             f"{len(self.items)} 个物品, {len(self.skills)} 个技能"
         )
+
+    def _build_vocab(self):
+        vocab = {}
+        for item in self.items:
+            h = item.get("heroes", "")
+            for p in h.split("/"):
+                p = p.strip()
+                if " | " in p:
+                    p = p.split(" | ")[0].strip()
+                if p and len(p) >= 2:
+                    vocab[p.lower()] = ("hero", p)
+            s = item.get("size", "")
+            for p in s.split("/"):
+                p = p.strip()
+                if p and len(p) >= 2:
+                    vocab[p.lower()] = ("size", p)
+            for field in ("tags", "hidden_tags"):
+                tv = item.get(field, "")
+                for t in tv.split("|"):
+                    for p in t.strip().split("/"):
+                        p = p.strip()
+                        if p and len(p) >= 2:
+                            vocab[p.lower()] = ("tag", p)
+        for k, v in TIER_MAP.items():
+            if len(k) >= 2:
+                vocab[k] = ("tier", v)
+        tier_cn_to_en = {"青铜": "Bronze", "白银": "Silver", "黄金": "Gold", "钻石": "Diamond", "传奇": "Legendary"}
+        for cn, en in tier_cn_to_en.items():
+            vocab[cn] = ("tier", en)
+            vocab[en.lower()] = ("tier", en)
+        self._vocab = vocab
+        self._vocab_sorted = sorted(vocab.keys(), key=len, reverse=True)
+
+    def _smart_tokenize(self, query: str) -> list:
+        tokens = query.split()
+        result = []
+        for token in tokens:
+            if ":" in token:
+                result.append(token)
+                continue
+            has_cjk = any('\u4e00' <= c <= '\u9fff' for c in token)
+            if has_cjk and len(token) >= 4:
+                remaining = token.lower()
+                extracted = []
+                while remaining:
+                    matched = False
+                    for term in self._vocab_sorted:
+                        if remaining.startswith(term):
+                            extracted.append(term)
+                            remaining = remaining[len(term):]
+                            matched = True
+                            break
+                    if not matched:
+                        for term in self._vocab_sorted:
+                            idx = remaining.find(term)
+                            if idx > 0:
+                                extracted.append(remaining[:idx])
+                                extracted.append(term)
+                                remaining = remaining[idx + len(term):]
+                                matched = True
+                                break
+                    if not matched:
+                        extracted.append(remaining)
+                        break
+                result.extend(extracted)
+            else:
+                result.append(token)
+        return result
 
     def _load_data(self):
         data_dir = self.plugin_dir / "data"
@@ -434,13 +503,11 @@ class BazaarPlugin(Star):
             "  示例: /tbzitem 地下商街\n\n"
             "/tbzskill <名称> - 查询技能详情(图片卡片)\n"
             "  示例: /tbzskill 热情如火\n\n"
-            "/tbzsearch <条件> - 多条件搜索(支持合并转发)\n"
-            "  关键词搜索: /tbzsearch 灼烧\n"
-            "  按标签筛选: /tbzsearch tag:Weapon\n"
-            "  按品质筛选: /tbzsearch tier:Gold\n"
-            "  按英雄筛选: /tbzsearch hero:Mak\n"
-            "  组合条件: /tbzsearch tag:Weapon hero:Mak tier:Gold\n"
-            "  无参数查看: /tbzsearch (显示可用标签/英雄)\n\n"
+            "/tbzsearch <条件> - 智能多条件搜索\n"
+            "  直接连写: /tbzsearch 杜利中型灼烧\n"
+            "  空格分隔: /tbzsearch 马克 黄金 武器\n"
+            "  前缀语法: /tbzsearch tag:Weapon hero:Mak\n"
+            "  无参数: /tbzsearch (显示搜索帮助)\n\n"
             "/tbzbuild <物品名> [数量] - 查询推荐阵容\n"
             "  示例: /tbzbuild 符文匕首\n\n"
             "/tbzupdate - 从远端更新游戏数据\n\n"
@@ -600,10 +667,15 @@ class BazaarPlugin(Star):
         yield event.plain_result(self._format_skill_info(found))
 
     def _parse_search_conditions(self, query: str) -> dict:
-        conditions = {"keyword": "", "tags": [], "tiers": [], "heroes": []}
+        conditions = {"keyword": "", "tags": [], "tiers": [], "heroes": [], "sizes": []}
         keywords = []
-        for part in query.split():
-            lower = part.lower()
+
+        tokens = self._smart_tokenize(query)
+
+        for part in tokens:
+            lower = part.lower().strip()
+            if not lower:
+                continue
             if ":" in part:
                 prefix, value = part.split(":", 1)
                 prefix = prefix.lower()
@@ -614,8 +686,20 @@ class BazaarPlugin(Star):
                     conditions["tiers"].append(normalized)
                 elif prefix in ("hero", "英雄"):
                     conditions["heroes"].append(value)
+                elif prefix in ("size", "尺寸"):
+                    conditions["sizes"].append(value)
                 else:
                     keywords.append(part)
+            elif lower in self._vocab:
+                vtype, vval = self._vocab[lower]
+                if vtype == "hero":
+                    conditions["heroes"].append(vval)
+                elif vtype == "tier":
+                    conditions["tiers"].append(vval)
+                elif vtype == "tag":
+                    conditions["tags"].append(vval)
+                elif vtype == "size":
+                    conditions["sizes"].append(vval)
             else:
                 keywords.append(part)
         conditions["keyword"] = " ".join(keywords)
@@ -644,15 +728,23 @@ class BazaarPlugin(Star):
                 if all(h.lower() in hero_str for h in conditions["heroes"]):
                     filtered.append(item)
             results = filtered
+        if conditions.get("sizes"):
+            filtered = []
+            for item in results:
+                size_str = item.get("size", "").lower()
+                if any(s.lower() in size_str for s in conditions["sizes"]):
+                    filtered.append(item)
+            results = filtered
         if conditions["keyword"]:
             kw = conditions["keyword"].lower()
             filtered = []
             for item in results:
-                if (kw in item.get("name_cn", "").lower() or
-                    kw in item.get("name_en", "").lower() or
-                    kw in item.get("tags", "").lower() or
-                    kw in item.get("hidden_tags", "").lower() or
-                    kw in item.get("heroes", "").lower()):
+                searchable = " ".join([
+                    item.get("name_cn", ""), item.get("name_en", ""),
+                    item.get("tags", ""), item.get("hidden_tags", ""),
+                    item.get("heroes", ""), item.get("size", ""),
+                ]).lower()
+                if kw in searchable:
                     filtered.append(item)
             results = filtered
         return results
@@ -701,11 +793,15 @@ class BazaarPlugin(Star):
             "🔍 多条件搜索帮助\n"
             "━━━━━━━━━━━━━━━━━━\n"
             "用法: /tbzsearch [条件...]\n\n"
-            "支持的条件:\n"
-            "  关键词 - 直接输入文字搜索名称/标签/描述\n"
-            "  tag:标签名 - 按标签筛选 (或 标签:标签名)\n"
-            "  tier:品质 - 按品质筛选 (或 品质:品质名)\n"
-            "  hero:英雄 - 按英雄筛选 (或 英雄:英雄名)\n\n"
+            "支持智能识别，可直接连写条件，无需前缀:\n"
+            "  /tbzsearch 杜利中型灼烧\n"
+            "  /tbzsearch 马克黄金武器\n"
+            "  /tbzsearch 青铜食物\n\n"
+            "也支持前缀语法:\n"
+            "  tag:标签名 / 标签:标签名\n"
+            "  tier:品质 / 品质:品质名\n"
+            "  hero:英雄 / 英雄:英雄名\n"
+            "  size:尺寸 / 尺寸:尺寸名\n\n"
             "示例:\n"
             "  /tbzsearch 灼烧\n"
             "  /tbzsearch tag:Weapon hero:Mak\n"
@@ -726,21 +822,35 @@ class BazaarPlugin(Star):
             return
 
         conditions = self._parse_search_conditions(query)
-        has_filters = conditions["tags"] or conditions["tiers"] or conditions["heroes"]
+        has_filters = conditions["tags"] or conditions["tiers"] or conditions["heroes"] or conditions.get("sizes")
 
         item_results = self._filter_items(conditions)
-        skill_results = self._filter_skills(conditions) if not conditions["tiers"] and not conditions["tags"] else []
+        skill_results = self._filter_skills(conditions) if not conditions["tiers"] and not conditions["tags"] and not conditions.get("sizes") else []
         monster_results = self._search_monsters(conditions["keyword"]) if conditions["keyword"] and not has_filters else []
 
         if not monster_results and not item_results and not skill_results:
             yield event.plain_result(f"未找到与「{query}」相关的结果。\n使用 /tbzsearch 查看搜索帮助。")
             return
 
-        condition_desc = query
+        parsed_parts = []
+        if conditions["heroes"]:
+            parsed_parts.append(f"英雄:{','.join(conditions['heroes'])}")
+        if conditions["tiers"]:
+            parsed_parts.append(f"品质:{','.join(conditions['tiers'])}")
+        if conditions["tags"]:
+            parsed_parts.append(f"标签:{','.join(conditions['tags'])}")
+        if conditions.get("sizes"):
+            parsed_parts.append(f"尺寸:{','.join(conditions['sizes'])}")
+        if conditions["keyword"]:
+            parsed_parts.append(f"关键词:{conditions['keyword']}")
+        parsed_hint = " | ".join(parsed_parts)
+
         total = len(monster_results) + len(item_results) + len(skill_results)
 
         nodes = []
-        header = f"🔍 搜索「{condition_desc}」的结果 (共{total}条)"
+        header = f"🔍 搜索「{query}」的结果 (共{total}条)"
+        if parsed_hint != query:
+            header += f"\n📋 识别条件: {parsed_hint}"
         nodes.append(Comp.Node(
             name="大巴扎小助手", uin="0",
             content=[Comp.Plain(header)]
@@ -839,6 +949,7 @@ class BazaarPlugin(Star):
 
         if success_count > 0:
             self._load_data()
+            self._build_vocab()
 
         summary = (
             f"📦 数据更新完成 ({success_count}/{len(DATA_FILES)})\n"
