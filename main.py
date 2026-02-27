@@ -1365,10 +1365,10 @@ class BazaarPlugin(Star):
 
     @filter.llm_tool(name="bazaar_query_item")
     async def tool_query_item(self, event: AstrMessageEvent, item_name: str):
-        '''查询 The Bazaar 游戏中的物品详细信息，包括技能、属性、数值、附魔和任务。当用户询问某个物品的效果、属性或详情时使用此工具。
+        '''查询 The Bazaar (大巴扎) 卡牌游戏中的物品详细信息，包括技能、属性、数值、附魔和任务。The Bazaar 是一款由 Tempo Storm 开发的 Roguelike 卡牌对战游戏。当用户提到 The Bazaar / 大巴扎 游戏中的物品名称，或者询问游戏物品的效果、属性时，请调用此工具。游戏中的物品例如：放大镜、符文匕首、船锚(Anchor)、热力长枪(Thermal Lance)、地下商街(Bazaar) 等。
 
         Args:
-            item_name(string): 物品名称，支持中文或英文。例如：放大镜、Magnifying Glass、符文匕首
+            item_name(string): The Bazaar 游戏物品名称，支持中文或英文。例如：放大镜、Magnifying Glass、符文匕首、船锚
         '''
         query = self._resolve_alias(item_name)
         kw = query.lower()
@@ -1397,10 +1397,10 @@ class BazaarPlugin(Star):
 
     @filter.llm_tool(name="bazaar_query_monster")
     async def tool_query_monster(self, event: AstrMessageEvent, monster_name: str):
-        '''查询 The Bazaar 游戏中的怪物详细信息，包括技能、物品、血量和奖励。当用户询问某个怪物的信息时使用此工具。
+        '''查询 The Bazaar (大巴扎) 卡牌游戏中的怪物/敌人详细信息，包括技能、掉落物品、血量和奖励。The Bazaar 是一款 Roguelike 卡牌对战游戏，玩家在 PvE 回合中对战各种怪物。当用户询问游戏中某个怪物/敌人/boss 的信息时，请调用此工具。
 
         Args:
-            monster_name(string): 怪物名称，支持中文或英文。例如：火灵、Tree Treant
+            monster_name(string): The Bazaar 游戏怪物名称，支持中文或英文。例如：火灵、Tree Treant、暗影猎手
         '''
         query = self._resolve_alias(monster_name)
         kw = query.lower()
@@ -1431,10 +1431,10 @@ class BazaarPlugin(Star):
 
     @filter.llm_tool(name="bazaar_query_skill")
     async def tool_query_skill(self, event: AstrMessageEvent, skill_name: str):
-        '''查询 The Bazaar 游戏中的技能详细信息，包括描述和适用英雄。当用户询问某个技能的效果或信息时使用此工具。
+        '''查询 The Bazaar (大巴扎) 卡牌游戏中的技能详细信息，包括描述和适用英雄。The Bazaar 游戏中每个英雄和物品都有独特的技能。当用户询问游戏中某个技能的效果或信息时，请调用此工具。
 
         Args:
-            skill_name(string): 技能名称，支持中文或英文。例如：热情如火、Burning Passion
+            skill_name(string): The Bazaar 游戏技能名称，支持中文或英文。例如：热情如火、Burning Passion
         '''
         query = self._resolve_alias(skill_name)
         kw = query.lower()
@@ -1460,10 +1460,10 @@ class BazaarPlugin(Star):
 
     @filter.llm_tool(name="bazaar_search")
     async def tool_search(self, event: AstrMessageEvent, query: str):
-        '''搜索 The Bazaar 游戏中的物品、怪物和技能。支持按关键词、英雄、标签、品质等多条件搜索。当用户想要查找某类物品或按条件筛选时使用此工具。
+        '''在 The Bazaar (大巴扎) 卡牌游戏数据库中搜索物品、怪物和技能。支持按关键词、英雄(如 Vanessa/Pygmalien/Dooley/Stelle/Jules/Mak)、标签(如 Weapon/Shield/Food)、品质(Bronze/Silver/Gold/Diamond) 等多条件搜索。当用户想要查找游戏中某一类物品、按条件筛选、或者问"有哪些xxx"时，请调用此工具。
 
         Args:
-            query(string): 搜索条件。可以是关键词、英雄名、标签名等。例如：灼烧、Mak的武器、黄金护盾。支持前缀语法如 tag:Weapon hero:Mak tier:Gold
+            query(string): 搜索条件。可以是关键词、英雄名、标签名等。例如：灼烧、武器、黄金护盾、Vanessa Weapon。支持前缀语法如 tag:Weapon hero:Mak tier:Gold
         '''
         self._reload_aliases_if_changed()
         conditions = self._parse_search_conditions(query)
