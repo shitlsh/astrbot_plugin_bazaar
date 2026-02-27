@@ -14,6 +14,10 @@ import astrbot.api.message_components as Comp
 BUILDS_API = "https://bazaar-builds.net/wp-json/wp/v2"
 DEFAULT_BUILD_COUNT = 3
 
+BUILD_FILTER_PATTERNS = re.compile(
+    r'(?i)\b(?:patch|hotfix|update|changelog|maintenance|downtime|release\s*note|dev\s*blog|news)\b'
+)
+
 TIER_EMOJI = {"Bronze": "🥉", "Silver": "🥈", "Gold": "🥇", "Diamond": "💎"}
 
 
@@ -1204,7 +1208,7 @@ class BazaarPlugin(Star):
         url = f"{BUILDS_API}/posts"
         params = {
             "search": search_term,
-            "per_page": count,
+            "per_page": min(count + 5, 20),
             "_fields": "id,title,link,date,excerpt,featured_media",
         }
         try:
@@ -1216,7 +1220,12 @@ class BazaarPlugin(Star):
 
             builds = []
             for post in posts:
+                if len(builds) >= count:
+                    break
                 title = html_module.unescape(post.get("title", {}).get("rendered", ""))
+                if BUILD_FILTER_PATTERNS.search(title):
+                    logger.debug(f"阵容查询过滤非阵容内容: {title}")
+                    continue
                 excerpt_raw = post.get("excerpt", {}).get("rendered", "")
                 excerpt_text = html_module.unescape(_strip_html(excerpt_raw))
 
