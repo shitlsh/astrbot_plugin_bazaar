@@ -37,19 +37,20 @@
 
 ## 图片卡片渲染
 - 使用 Pillow 生成深色主题 PNG 卡片
-- 缩略图 96px，保持原始宽高比（源图来自 BazaarHelper GitHub 仓库，缓存到 `data/cache/`）
+- 2x 高清渲染（SCALE=2），输出 1040px 宽卡片，文字清晰锐利
+- 缩略图 192px (96*2)，保持原始宽高比（源图来自 BazaarHelper GitHub 仓库，缓存到 `data/cache/`）
 - 品质（Bronze/Silver/Gold/Diamond）使用对应颜色高亮
 - 物品卡片包含：技能、属性、数值(含tier成长)、附魔、任务
 - 渲染失败时自动回退到纯文本输出
 - 需要中文字体支持（WenQuanYi Zen Hei）
 
 ## 多条件搜索
-- `/tbzsearch` 支持多种条件前缀：
-  - `tag:标签名` 或 `标签:标签名` - 按标签筛选
-  - `tier:品质` 或 `品质:品质名` - 按品质筛选
-  - `hero:英雄` 或 `英雄:英雄名` - 按英雄筛选
-  - 纯文本 - 关键词搜索名称/标签/描述
-- 条件可自由组合，如 `/tbzsearch tag:Weapon hero:Mak tier:Gold`
+- `/tbzsearch` 支持智能模糊识别和前缀语法：
+  - 智能连写: `/tbzsearch 杜利中型灼烧` (自动分词为 英雄+尺寸+标签)
+  - 空格分隔: `/tbzsearch 马克 黄金 武器`
+  - 前缀语法: `tag:` `tier:` `hero:` `size:` (中文别名: `标签:` `品质:` `英雄:` `尺寸:`)
+- `_build_vocab()` 从数据构建词汇索引，`_smart_tokenize()` 用最长匹配贪心算法自动分词
+- 搜索结果显示"识别条件"让用户确认理解是否正确
 - 搜索结果完整展示（不截断），使用合并转发消息格式
 
 ## 阵容查询

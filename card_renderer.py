@@ -43,39 +43,41 @@ TIER_COLORS = {
     "Diamond": COLORS["tier_diamond"],
 }
 
-CARD_WIDTH = 520
-BUILD_CARD_WIDTH = 560
-PADDING = 20
-HEADER_RADIUS = 12
-BADGE_RADIUS = 4
-TAG_RADIUS = 4
+SCALE = 2
 
-LINE_HEIGHT_TITLE = 34
-LINE_HEIGHT_SUBTITLE = 22
-LINE_HEIGHT_BODY = 22
-LINE_HEIGHT_SMALL = 18
-LINE_HEIGHT_LINK = 16
-LINE_HEIGHT_EXCERPT = 17
-LINE_HEIGHT_DETAIL = 22
-LINE_HEIGHT_STAT = 22
-LINE_HEIGHT_ITEM = 26
-LINE_HEIGHT_SKILL = 26
+CARD_WIDTH = 520 * SCALE
+BUILD_CARD_WIDTH = 560 * SCALE
+PADDING = 20 * SCALE
+HEADER_RADIUS = 12 * SCALE
+BADGE_RADIUS = 4 * SCALE
+TAG_RADIUS = 4 * SCALE
 
-SECTION_GAP = 10
-INDENT = 10
-INDENT_DEEP = 20
-DESC_GAP = 4
-SKILL_DESC_GAP = 6
-THUMB_SIZE = 96
-THUMB_MARGIN = 108
+LINE_HEIGHT_TITLE = 34 * SCALE
+LINE_HEIGHT_SUBTITLE = 22 * SCALE
+LINE_HEIGHT_BODY = 22 * SCALE
+LINE_HEIGHT_SMALL = 18 * SCALE
+LINE_HEIGHT_LINK = 16 * SCALE
+LINE_HEIGHT_EXCERPT = 17 * SCALE
+LINE_HEIGHT_DETAIL = 22 * SCALE
+LINE_HEIGHT_STAT = 22 * SCALE
+LINE_HEIGHT_ITEM = 26 * SCALE
+LINE_HEIGHT_SKILL = 26 * SCALE
 
-FONT_SIZE_TITLE = 28
-FONT_SIZE_TITLE_SMALL = 26
-FONT_SIZE_SUBTITLE = 18
-FONT_SIZE_BODY = 16
-FONT_SIZE_SMALL = 14
-FONT_SIZE_TAG = 13
-FONT_SIZE_LINK = 12
+SECTION_GAP = 10 * SCALE
+INDENT = 10 * SCALE
+INDENT_DEEP = 20 * SCALE
+DESC_GAP = 4 * SCALE
+SKILL_DESC_GAP = 6 * SCALE
+THUMB_SIZE = 96 * SCALE
+THUMB_MARGIN = 108 * SCALE
+
+FONT_SIZE_TITLE = 28 * SCALE
+FONT_SIZE_TITLE_SMALL = 26 * SCALE
+FONT_SIZE_SUBTITLE = 18 * SCALE
+FONT_SIZE_BODY = 16 * SCALE
+FONT_SIZE_SMALL = 14 * SCALE
+FONT_SIZE_TAG = 13 * SCALE
+FONT_SIZE_LINK = 12 * SCALE
 
 _CJK_RANGES = re.compile(r'[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]')
 
@@ -186,19 +188,19 @@ class CardRenderer:
         draw.rounded_rectangle(xy, radius=radius, fill=fill)
 
     def _draw_divider(self, draw, y, card_width):
-        draw.line((PADDING, y, card_width - PADDING, y), fill=COLORS["divider"], width=1)
+        draw.line((PADDING, y, card_width - PADDING, y), fill=COLORS["divider"], width=SCALE)
 
     def _draw_tier_badge(self, draw, tier_raw, tier_clean, y, card_width, font_tag):
         tier_color = TIER_COLORS.get(tier_clean, COLORS["text_dim"])
         tier_badge = f" {tier_raw} "
         bbox = font_tag.getbbox(tier_badge)
-        tw = bbox[2] - bbox[0] + 12
+        tw = bbox[2] - bbox[0] + 12 * SCALE
         badge_x = card_width - PADDING - tw
         draw.rounded_rectangle(
-            (badge_x, y + SECTION_GAP, badge_x + tw, y + 28), radius=BADGE_RADIUS, fill=tier_color
+            (badge_x, y + SECTION_GAP, badge_x + tw, y + 28 * SCALE), radius=BADGE_RADIUS, fill=tier_color
         )
         draw.text(
-            (badge_x + 6, y + 11), tier_badge.strip(), font=font_tag,
+            (badge_x + 6 * SCALE, y + 11 * SCALE), tier_badge.strip(), font=font_tag,
             fill=COLORS["bg"] if tier_clean in ("Gold", "Diamond") else COLORS["text"]
         )
 
@@ -220,7 +222,7 @@ class CardRenderer:
             f"{GITHUB_RAW}/assets/monsters/characters/{name_zh}.webp"
         )
 
-        header_height = 80 if not monster_img else 120
+        header_height = 80 * SCALE if not monster_img else 120 * SCALE
         sections.append(("header", header_height))
 
         info_lines = []
@@ -301,29 +303,29 @@ class CardRenderer:
             new_w = max(1, int(orig_w * ratio))
             new_h = max(1, int(orig_h * ratio))
             thumb = monster_img.resize((new_w, new_h), Image.LANCZOS)
-            thumb_y = y + 8 + (THUMB_SIZE - new_h) // 2
+            thumb_y = y + 8 * SCALE + (THUMB_SIZE - new_h) // 2
             thumb_x = PADDING + (THUMB_SIZE - new_w) // 2
             img.paste(thumb, (thumb_x, thumb_y), thumb)
             text_x = PADDING + THUMB_MARGIN
         else:
             text_x = PADDING
 
-        draw.text((text_x, y + 12), name_zh, font=font_title, fill=COLORS["text"])
-        draw.text((text_x, y + 46), name_en, font=font_subtitle, fill=COLORS["text_dim"])
+        draw.text((text_x, y + 12 * SCALE), name_zh, font=font_title, fill=COLORS["text"])
+        draw.text((text_x, y + 46 * SCALE), name_en, font=font_subtitle, fill=COLORS["text_dim"])
 
         tags = monster.get("tags", [])
         if isinstance(tags, list) and tags:
             tag_x = text_x
             for tag in tags[:4]:
                 bbox = font_tag.getbbox(tag)
-                tw = bbox[2] - bbox[0] + 12
+                tw = bbox[2] - bbox[0] + 12 * SCALE
                 if tag_x + tw > CARD_WIDTH - PADDING:
                     break
                 draw.rounded_rectangle(
-                    (tag_x, y + 64, tag_x + tw, y + 82), radius=TAG_RADIUS, fill=COLORS["divider"]
+                    (tag_x, y + 64 * SCALE, tag_x + tw, y + 82 * SCALE), radius=TAG_RADIUS, fill=COLORS["divider"]
                 )
-                draw.text((tag_x + 6, y + 65), tag, font=font_tag, fill=COLORS["accent"])
-                tag_x += tw + 6
+                draw.text((tag_x + 6 * SCALE, y + 65 * SCALE), tag, font=font_tag, fill=COLORS["accent"])
+                tag_x += tw + 6 * SCALE
 
         y = header_height + PADDING + SECTION_GAP
 
@@ -346,11 +348,11 @@ class CardRenderer:
                     tier_str = s.get("tier", s.get("current_tier", ""))
                     tier_clean = _clean_tier(tier_str)
                     tier_color = TIER_COLORS.get(tier_clean, COLORS["text_dim"])
-                    draw.text((PADDING + 8, y), f"● {name}", font=font_body, fill=tier_color)
+                    draw.text((PADDING + 8 * SCALE, y), f"● {name}", font=font_body, fill=tier_color)
                     bbox = font_body.getbbox(f"● {name}")
                     name_w = bbox[2] - bbox[0]
                     draw.text(
-                        (PADDING + 8 + name_w + 8, y + 2), f"[{tier_str}]",
+                        (PADDING + 8 * SCALE + name_w + 8 * SCALE, y + 2 * SCALE), f"[{tier_str}]",
                         font=font_small, fill=COLORS["text_dim"]
                     )
                     y += LINE_HEIGHT_SKILL
@@ -383,7 +385,7 @@ class CardRenderer:
                     if count > 6:
                         remaining = len(set(i.get("id", i.get("name", "")) for i in items)) - 6
                         draw.text(
-                            (PADDING + 8, y), f"... 还有{remaining}个物品",
+                            (PADDING + 8 * SCALE, y), f"... 还有{remaining}个物品",
                             font=font_small, fill=COLORS["text_dim"]
                         )
                         y += LINE_HEIGHT_DETAIL
@@ -392,11 +394,11 @@ class CardRenderer:
                     tier_str = it.get("tier", it.get("current_tier", ""))
                     tier_clean = _clean_tier(tier_str)
                     tier_color = TIER_COLORS.get(tier_clean, COLORS["text_dim"])
-                    draw.text((PADDING + 8, y), f"● {name}", font=font_body, fill=tier_color)
+                    draw.text((PADDING + 8 * SCALE, y), f"● {name}", font=font_body, fill=tier_color)
                     bbox = font_body.getbbox(f"● {name}")
                     name_w = bbox[2] - bbox[0]
                     draw.text(
-                        (PADDING + 8 + name_w + 8, y + 2), f"[{tier_str}]",
+                        (PADDING + 8 * SCALE + name_w + 8 * SCALE, y + 2 * SCALE), f"[{tier_str}]",
                         font=font_small, fill=COLORS["text_dim"]
                     )
                     y += LINE_HEIGHT_ITEM
@@ -437,7 +439,7 @@ class CardRenderer:
 
         sections_height = 0
 
-        header_h = 110
+        header_h = 110 * SCALE
         sections_height += header_h
 
         active_skills = item.get("skills", [])
@@ -540,15 +542,15 @@ class CardRenderer:
             new_w = max(1, int(orig_w * ratio))
             new_h = max(1, int(orig_h * ratio))
             thumb = item_img.resize((new_w, new_h), Image.LANCZOS)
-            thumb_y = y + 8 + (THUMB_SIZE - new_h) // 2
+            thumb_y = y + 8 * SCALE + (THUMB_SIZE - new_h) // 2
             thumb_x = PADDING + (THUMB_SIZE - new_w) // 2
             img.paste(thumb, (thumb_x, thumb_y), thumb)
             text_x = PADDING + THUMB_MARGIN
         else:
             text_x = PADDING
 
-        draw.text((text_x, y + 12), name_cn, font=font_title, fill=COLORS["text"])
-        draw.text((text_x, y + 46), name_en, font=font_subtitle, fill=COLORS["text_dim"])
+        draw.text((text_x, y + 12 * SCALE), name_cn, font=font_title, fill=COLORS["text"])
+        draw.text((text_x, y + 46 * SCALE), name_en, font=font_subtitle, fill=COLORS["text_dim"])
 
         self._draw_tier_badge(draw, tier_raw, tier_clean, y, CARD_WIDTH, font_tag)
 
@@ -595,7 +597,7 @@ class CardRenderer:
                     bbox = font_body.getbbox(val_text)
                     vw = bbox[2] - bbox[0]
                     draw.text(
-                        (PADDING + INDENT + vw + 8, y + 2), f"({tiers_str})",
+                        (PADDING + INDENT + vw + 8 * SCALE, y + 2 * SCALE), f"({tiers_str})",
                         font=font_small, fill=COLORS["text_dim"]
                     )
                 y += LINE_HEIGHT_STAT
@@ -612,7 +614,7 @@ class CardRenderer:
                     y += PADDING
                     effect = ench_data.get("effect_cn", ench_data.get("effect_en", ""))
                     for wl in self._wrap_text(effect, font_small, content_width - INDENT_DEEP):
-                        draw.text((PADDING + INDENT_DEEP + 2, y), wl, font=font_small, fill=COLORS["text_dim"])
+                        draw.text((PADDING + INDENT_DEEP + 2 * SCALE, y), wl, font=font_small, fill=COLORS["text_dim"])
                         y += LINE_HEIGHT_SMALL
             if quests:
                 self._draw_divider(draw, y + SECTION_GAP, CARD_WIDTH)
@@ -652,7 +654,7 @@ class CardRenderer:
 
         content_width = CARD_WIDTH - PADDING * 2
 
-        header_h = 70
+        header_h = 70 * SCALE
         body_h = PADDING
 
         desc_cn = skill.get("description_cn", "")
@@ -696,8 +698,8 @@ class CardRenderer:
         y = PADDING
         self._draw_rounded_rect(draw, (0, 0, CARD_WIDTH, header_h + PADDING), HEADER_RADIUS, COLORS["header_bg"])
 
-        draw.text((PADDING, y + 8), name_cn, font=font_title, fill=COLORS["text"])
-        draw.text((PADDING, y + 40), name_en, font=font_subtitle, fill=COLORS["text_dim"])
+        draw.text((PADDING, y + 8 * SCALE), name_cn, font=font_title, fill=COLORS["text"])
+        draw.text((PADDING, y + 40 * SCALE), name_en, font=font_subtitle, fill=COLORS["text_dim"])
 
         self._draw_tier_badge(draw, tier_raw, tier_clean, y, CARD_WIDTH, font_tag)
 
@@ -740,15 +742,15 @@ class CardRenderer:
         return buf_skill.getvalue()
 
     async def render_build_card(self, query: str, search_term: str, builds: list) -> bytes:
-        font_title = self._font(24)
+        font_title = self._font(24 * SCALE)
         font_subtitle = self._font(FONT_SIZE_SUBTITLE)
-        font_body = self._font(15)
+        font_body = self._font(15 * SCALE)
         font_small = self._font(FONT_SIZE_TAG)
         font_link = self._font(FONT_SIZE_LINK)
 
         content_width = BUILD_CARD_WIDTH - PADDING * 2
 
-        header_h = 60
+        header_h = 60 * SCALE
         body_h = 0
 
         for build in builds:
@@ -765,7 +767,7 @@ class CardRenderer:
             body_h += bh
 
         body_h += (len(builds) - 1) * SECTION_GAP
-        footer_h = 30
+        footer_h = 30 * SCALE
 
         total_height = header_h + body_h + footer_h + PADDING * 3
         img = Image.new("RGBA", (BUILD_CARD_WIDTH, total_height), COLORS["bg"])
@@ -775,11 +777,11 @@ class CardRenderer:
         self._draw_rounded_rect(draw, (0, 0, BUILD_CARD_WIDTH, header_h + PADDING), HEADER_RADIUS, COLORS["header_bg"])
 
         title_text = f"🏗️ 「{query}」推荐阵容"
-        draw.text((PADDING, y + 6), title_text, font=font_title, fill=COLORS["text"])
+        draw.text((PADDING, y + 6 * SCALE), title_text, font=font_title, fill=COLORS["text"])
         sub = f"来源: bazaar-builds.net | 共{len(builds)}条结果"
         if search_term != query:
             sub = f"搜索: {search_term} | " + sub
-        draw.text((PADDING, y + 34), sub, font=font_small, fill=COLORS["text_dim"])
+        draw.text((PADDING, y + 34 * SCALE), sub, font=font_small, fill=COLORS["text_dim"])
 
         y = header_h + PADDING + SECTION_GAP
 
@@ -790,9 +792,9 @@ class CardRenderer:
             draw.rounded_rectangle(
                 (PADDING, y, PADDING + bw, y + LINE_HEIGHT_SUBTITLE), radius=BADGE_RADIUS, fill=COLORS["accent"]
             )
-            draw.text((PADDING + 5, y + 2), num_badge.strip(), font=font_body, fill=COLORS["bg"])
+            draw.text((PADDING + 5 * SCALE, y + 2 * SCALE), num_badge.strip(), font=font_body, fill=COLORS["bg"])
 
-            title_x = PADDING + bw + 8
+            title_x = PADDING + bw + 8 * SCALE
             title_lines = self._wrap_text(build["title"], font_subtitle, content_width - bw - INDENT)
             for j, tl in enumerate(title_lines):
                 draw.text((title_x if j == 0 else PADDING + INDENT, y), tl, font=font_subtitle, fill=COLORS["text"])
