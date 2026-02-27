@@ -1,0 +1,290 @@
+{
+  "火灵": {
+    "name": "Pyro",
+    "name_zh": "火灵",
+    "skills": [
+      {
+        "id": "skill-fiery",
+        "name": "炽焰",
+        "name_en": "Fiery",
+        "tier": "Bronze",
+        "description": "灼烧物品+1 » +2 » +3 » +4灼烧。"
+      }
+    ],
+    "items": [
+      {
+        "id": "d45bb1dd-5342-4c69-b7fe-f56d3fac7d1f",
+        "name": "余烬",
+        "name_en": "Cinders",
+        "tier": "Silver",
+        "description": "出售此物品时，最左侧灼烧物品的灼烧提高+1 » +2 » +4 » +8。"
+      },
+      {
+        "id": "3d212e22-12eb-427e-ab96-e7baf1229a7b",
+        "name": "打火机",
+        "name_en": "Lighter",
+        "tier": "Silver",
+        "description": "造成3 » 5 » 7 » 9灼烧。"
+      },
+      {
+        "id": "a1b2c3d4-fire-tongs",
+        "name": "火钳",
+        "name_en": "Fire Tongs",
+        "tier": "Bronze",
+        "description": "每次灼烧触发时，额外造成1 » 2 » 3 » 4伤害。"
+      }
+    ]
+  },
+  "暴风雪": {
+    "name": "Blizzard",
+    "name_zh": "暴风雪",
+    "skills": [
+      {
+        "id": "skill-frostbite",
+        "name": "冻伤",
+        "name_en": "Frostbite",
+        "tier": "Bronze",
+        "description": "冰冻物品+1 » +2 » +3 » +4冰冻。"
+      }
+    ],
+    "items": [
+      {
+        "id": "blz-001",
+        "name": "冰锥",
+        "name_en": "Icicle",
+        "tier": "Silver",
+        "description": "造成3 » 5 » 7 » 9冰冻伤害。"
+      },
+      {
+        "id": "blz-002",
+        "name": "雪球",
+        "name_en": "Snowball",
+        "tier": "Bronze",
+        "description": "造成2 » 3 » 4 » 5冰冻。"
+      },
+      {
+        "id": "blz-003",
+        "name": "寒冰护甲",
+        "name_en": "Ice Armor",
+        "tier": "Gold",
+        "description": "获得2 » 4 » 6 » 8护盾，并冰冻攻击者。"
+      }
+    ]
+  },
+  "毒蛛": {
+    "name": "Venomweaver",
+    "name_zh": "毒蛛",
+    "skills": [
+      {
+        "id": "skill-toxic",
+        "name": "剧毒",
+        "name_en": "Toxic",
+        "tier": "Bronze",
+        "description": "中毒物品+1 » +2 » +3 » +4中毒。"
+      }
+    ],
+    "items": [
+      {
+        "id": "ven-001",
+        "name": "毒液瓶",
+        "name_en": "Venom Vial",
+        "tier": "Silver",
+        "description": "造成3 » 5 » 7 » 9中毒。"
+      },
+      {
+        "id": "ven-002",
+        "name": "蛛丝",
+        "name_en": "Spider Silk",
+        "tier": "Bronze",
+        "description": "减速敌方物品1 » 2 » 3 » 4秒。"
+      },
+      {
+        "id": "ven-003",
+        "name": "腐蚀之牙",
+        "name_en": "Corrosive Fang",
+        "tier": "Gold",
+        "description": "每次中毒触发额外造成2 » 4 » 6 » 8伤害。"
+      }
+    ]
+  },
+  "树人": {
+    "name": "Treant",
+    "name_zh": "树人",
+    "skills": [
+      {
+        "id": "skill-regrowth",
+        "name": "再生",
+        "name_en": "Regrowth",
+        "tier": "Bronze",
+        "description": "再生物品+1 » +2 » +3 » +4再生。"
+      }
+    ],
+    "items": [
+      {
+        "id": "tre-001",
+        "name": "生命之种",
+        "name_en": "Life Seed",
+        "tier": "Silver",
+        "description": "恢复3 » 5 » 7 » 9生命值。"
+      },
+      {
+        "id": "tre-002",
+        "name": "树皮盾",
+        "name_en": "Bark Shield",
+        "tier": "Bronze",
+        "description": "获得2 » 4 » 6 » 8护盾。"
+      },
+      {
+        "id": "tre-003",
+        "name": "自然之力",
+        "name_en": "Nature's Force",
+        "tier": "Gold",
+        "description": "每次再生触发额外恢复1 » 2 » 3 » 4生命。"
+      }
+    ]
+  },
+  "雷霆": {
+    "name": "Thunder",
+    "name_zh": "雷霆",
+    "skills": [
+      {
+        "id": "skill-electrify",
+        "name": "通电",
+        "name_en": "Electrify",
+        "tier": "Bronze",
+        "description": "充能物品+1 » +2 » +3 » +4充能。"
+      }
+    ],
+    "items": [
+      {
+        "id": "thu-001",
+        "name": "闪电链",
+        "name_en": "Lightning Chain",
+        "tier": "Silver",
+        "description": "造成4 » 6 » 8 » 10伤害，并为相邻物品充能1秒。"
+      },
+      {
+        "id": "thu-002",
+        "name": "蓄电池",
+        "name_en": "Battery",
+        "tier": "Bronze",
+        "description": "为相邻物品充能1 » 2 » 3 » 4秒。"
+      },
+      {
+        "id": "thu-003",
+        "name": "雷霆之锤",
+        "name_en": "Thunder Hammer",
+        "tier": "Gold",
+        "description": "造成5 » 8 » 12 » 16伤害，暴击率+10%。"
+      }
+    ]
+  },
+  "哥布林": {
+    "name": "Goblin",
+    "name_zh": "哥布林",
+    "skills": [
+      {
+        "id": "skill-greed",
+        "name": "贪婪",
+        "name_en": "Greed",
+        "tier": "Bronze",
+        "description": "出售物品额外获得+1 » +2 » +3 » +4金币。"
+      }
+    ],
+    "items": [
+      {
+        "id": "gob-001",
+        "name": "金币袋",
+        "name_en": "Gold Pouch",
+        "tier": "Silver",
+        "description": "获得2 » 3 » 5 » 8金币。"
+      },
+      {
+        "id": "gob-002",
+        "name": "偷窃之手",
+        "name_en": "Thieving Hand",
+        "tier": "Bronze",
+        "description": "偷取敌方1 » 2 » 3 » 4金币。"
+      },
+      {
+        "id": "gob-003",
+        "name": "藏宝图",
+        "name_en": "Treasure Map",
+        "tier": "Gold",
+        "description": "商店刷新时额外出现1件稀有物品。"
+      }
+    ]
+  },
+  "骷髅": {
+    "name": "Skeleton",
+    "name_zh": "骷髅",
+    "skills": [
+      {
+        "id": "skill-undead",
+        "name": "亡灵",
+        "name_en": "Undead",
+        "tier": "Bronze",
+        "description": "受到致命伤害时，有20% » 30% » 40% » 50%概率复活。"
+      }
+    ],
+    "items": [
+      {
+        "id": "ske-001",
+        "name": "骨刃",
+        "name_en": "Bone Blade",
+        "tier": "Silver",
+        "description": "造成3 » 5 » 7 » 9伤害。"
+      },
+      {
+        "id": "ske-002",
+        "name": "暗影斗篷",
+        "name_en": "Shadow Cloak",
+        "tier": "Bronze",
+        "description": "获得1 » 2 » 3 » 4闪避。"
+      },
+      {
+        "id": "ske-003",
+        "name": "亡灵之书",
+        "name_en": "Necronomicon",
+        "tier": "Diamond",
+        "description": "每次击杀敌方物品，永久获得+1 » +2 » +3 » +4伤害。"
+      }
+    ]
+  },
+  "美杜莎": {
+    "name": "Medusa",
+    "name_zh": "美杜莎",
+    "skills": [
+      {
+        "id": "skill-petrify",
+        "name": "石化",
+        "name_en": "Petrify",
+        "tier": "Silver",
+        "description": "攻击时有15% » 25% » 35% » 45%概率石化敌方物品2秒。"
+      }
+    ],
+    "items": [
+      {
+        "id": "med-001",
+        "name": "石化之眼",
+        "name_en": "Petrifying Gaze",
+        "tier": "Gold",
+        "description": "石化敌方一个物品2 » 3 » 4 » 5秒。"
+      },
+      {
+        "id": "med-002",
+        "name": "蛇发",
+        "name_en": "Snake Hair",
+        "tier": "Silver",
+        "description": "造成2 » 4 » 6 » 8中毒，并有概率石化。"
+      },
+      {
+        "id": "med-003",
+        "name": "石盾",
+        "name_en": "Stone Shield",
+        "tier": "Bronze",
+        "description": "获得3 » 5 » 7 » 9护盾。"
+      }
+    ]
+  }
+}

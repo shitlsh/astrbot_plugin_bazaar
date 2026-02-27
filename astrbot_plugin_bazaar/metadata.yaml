@@ -1,0 +1,6 @@
+name: astrbot_plugin_bazaar
+display_name: Bazaar 数据查询助手
+desc: 基于 BazaarHelper 的 The Bazaar 游戏数据查询插件，支持怪物、物品、技能查询与搜索。
+version: 1.0.0
+author: BazaarHelper
+repo: https://github.com/Duangi/BazaarHelper
