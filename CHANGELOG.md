@@ -4,9 +4,10 @@
 
 ### Features
 
-- 别名系统：新增 `/tbzalias` 命令管理别名（list/add/del），配置持久化到 `data/aliases.json`
+- 别名系统：新增 `/tbzalias` 命令管理别名（list/add/del），支持 AstrBot 管理面板配置（`_conf_schema.json`）
   - 支持 7 种分类：hero, item, monster, skill, tag, tier, size
-  - 后台文件和命令行两种方式修改后数据自动保持一致（文件变更自动检测重载）
+  - 配置方式：AstrBot 管理面板（推荐）/ `/tbzalias` 命令；无 AstrBotConfig 时回退到 `data/aliases.json`
+  - 配置变更自动检测重载（config 模式每次查询读取最新配置，文件模式通过 mtime 检测）
 - 预置社区常用英雄别名：猪猪/猪/猪哥→Pygmalien、鸡煲/机宝→Dooley、海盗/海盗姐→Vanessa、黑妹→Stelle、厨子/大厨/厨师→Jules、中立/通用→Common
 - `/tbzbuild` 阵容查询支持智能分词和别名：`/tbzbuild 海盗船锚` 自动识别为 `Vanessa Anchor` 搜索
 - 智能分词 CJK 模糊匹配：`/tbzsearch 杜利中型灼烧` 自动分词为英雄+尺寸+标签条件

@@ -47,12 +47,13 @@ Bazaar Builds 是一个由社区驱动的 The Bazaar 阵容分享网站，玩家
 ## 功能特性
 
 - 查询怪物详情（技能、物品、血量、奖励），以图片卡片展示
-- 查询物品详情（属性、品质成长、附魔），以图片卡片展示
+- 查询物品详情（属性、品质成长、附魔、任务），以图片卡片展示
 - 查询技能详情（描述、适用英雄），以图片卡片展示
-- 按关键词全局搜索怪物、物品和技能
-- 按标签、品质筛选物品
-- 按英雄查看专属物品和技能
+- 统一的多条件搜索：支持关键词、标签、品质、英雄、尺寸条件组合
+- 智能分词：中文连写自动识别条件，如 `/tbzsearch 杜利中型灼烧`
 - 通过物品名查询社区推荐阵容（展示阵容截图）
+- 别名系统：支持社区昵称映射，可通过 AstrBot 管理面板或命令管理
+- 在线数据更新：一键从 BazaarHelper 仓库拉取最新数据
 - 支持中英文双语查询
 - 图片渲染失败时自动回退为纯文本
 
@@ -96,41 +97,99 @@ sudo yum install wqy-zenhei-fonts
 | `/tbzmonster <名称>` | 查询怪物详情（图片卡片） | `/tbzmonster 火灵` |
 | `/tbzitem <名称>` | 查询物品详情（图片卡片） | `/tbzitem 放大镜` |
 | `/tbzskill <名称>` | 查询技能详情（图片卡片） | `/tbzskill 热情如火` |
-| `/tbzsearch <关键词>` | 搜索怪物、物品和技能 | `/tbzsearch 灼烧` |
-| `/tbzitems [标签]` | 按标签筛选物品 | `/tbzitems Weapon` |
-| `/tbztier <品质>` | 按品质筛选物品 | `/tbztier Gold` |
-| `/tbzhero <英雄名>` | 查看英雄专属内容 | `/tbzhero 朱尔斯` |
+| `/tbzsearch <条件>` | 多条件搜索 | `/tbzsearch 杜利中型灼烧` |
 | `/tbzbuild <物品名> [数量]` | 查询推荐阵容 | `/tbzbuild 符文匕首 5` |
+| `/tbzalias` | 别名管理 | `/tbzalias list hero` |
+| `/tbzupdate` | 从远端更新游戏数据 | `/tbzupdate` |
 
 所有指令均支持中英文输入。
+
+### /tbzsearch 多条件搜索
+
+支持三种输入方式：
+
+- **智能连写**: `/tbzsearch 杜利中型灼烧` — 自动分词为英雄+尺寸+标签
+- **空格分隔**: `/tbzsearch 马克 黄金 武器`
+- **前缀语法**: `/tbzsearch tag:Weapon hero:Mak tier:Gold`
+
+可用前缀：
+- `tag:` / `标签:` — 按标签筛选
+- `tier:` / `品质:` — 按品质筛选（Bronze/Silver/Gold/Diamond）
+- `hero:` / `英雄:` — 按英雄筛选
+- `size:` / `尺寸:` — 按尺寸筛选
+
+无参数调用 `/tbzsearch` 可查看所有可用标签和英雄列表。
 
 ### /tbzbuild 说明
 
 - 输入中文物品名会自动翻译为英文进行搜索
+- 支持别名和智能分词：`/tbzbuild 海盗船锚` 自动识别为 `Vanessa Anchor`
 - 默认展示前 3 条结果，可在末尾指定数量（1-10）
 - 每条结果包含阵容截图和原文链接
 - 示例：`/tbzbuild Runic Daggers` 或 `/tbzbuild 符文匕首 5`
+
+### /tbzalias 别名管理
+
+别名系统支持将社区昵称映射到游戏内名称，在搜索和阵容查询时自动识别。
+
+**配置方式（三选一）：**
+
+1. **AstrBot 管理面板**（推荐）：在插件配置页面直接编辑各分类别名
+2. **命令管理**：
+   - 查看: `/tbzalias list [分类]`
+   - 添加: `/tbzalias add hero 猪猪 Pygmalien`
+   - 删除: `/tbzalias del hero 猪猪`
+3. **直接编辑文件**：修改 `data/aliases.json`
+
+支持 7 种分类：`hero`(英雄)、`item`(物品)、`monster`(怪物)、`skill`(技能)、`tag`(标签)、`tier`(品质)、`size`(尺寸)
+
+预置别名：猪猪→Pygmalien、鸡煲→Dooley、海盗→Vanessa、黑妹→Stelle、厨子→Jules、中立→Common 等。
+
+## 插件配置
+
+本插件使用 AstrBot 的 `_conf_schema.json` 配置系统，别名可通过 AstrBot 管理面板直接编辑，无需手动修改文件。
+
+配置项：
+
+| 配置名 | 说明 | 类型 |
+|--------|------|------|
+| `hero_aliases` | 英雄别名 | dict |
+| `item_aliases` | 物品别名 | dict |
+| `monster_aliases` | 怪物别名 | dict |
+| `skill_aliases` | 技能别名 | dict |
+| `tag_aliases` | 标签别名 | dict |
+| `tier_aliases` | 品质别名 | dict |
+| `size_aliases` | 尺寸别名 | dict |
 
 ## 项目结构
 
 ```
 ├── main.py              # 插件主代码（指令处理器）
 ├── card_renderer.py     # 图片卡片渲染器（Pillow）
+├── _conf_schema.json    # AstrBot 插件配置 Schema
 ├── metadata.yaml        # AstrBot 插件元数据
 ├── requirements.txt     # Python 依赖
 ├── logo.png             # 插件 Logo
 ├── README.md            # 本文件
+├── CHANGELOG.md         # 更新日志
 ├── LICENSE              # MIT 许可证
 └── data/
     ├── items_db.json    # 物品数据库
     ├── monsters_db.json # 怪物数据库
     ├── skills_db.json   # 技能数据库
+    ├── aliases.json     # 别名配置（向下兼容）
     └── cache/           # 图片缓存（自动创建）
 ```
 
 ## 更新数据
 
-游戏数据可从 BazaarHelper 仓库获取最新版本：
+方式一：使用指令在线更新（推荐）
+
+```
+/tbzupdate
+```
+
+方式二：手动从 BazaarHelper 仓库下载
 
 ```bash
 cd astrbot_plugin_bazaar/data/

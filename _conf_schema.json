@@ -1,0 +1,65 @@
+{
+  "hero_aliases": {
+    "description": "英雄别名",
+    "type": "dict",
+    "hint": "将社区昵称映射到游戏内英雄英文名，如 猪猪→Pygmalien。搜索和阵容查询时自动识别。",
+    "items": {},
+    "default": {
+      "猪猪": "Pygmalien",
+      "猪": "Pygmalien",
+      "猪哥": "Pygmalien",
+      "鸡煲": "Dooley",
+      "机宝": "Dooley",
+      "海盗": "Vanessa",
+      "海盗姐": "Vanessa",
+      "黑妹": "Stelle",
+      "厨子": "Jules",
+      "大厨": "Jules",
+      "厨师": "Jules",
+      "中立": "Common",
+      "通用": "Common"
+    }
+  },
+  "item_aliases": {
+    "description": "物品别名",
+    "type": "dict",
+    "hint": "将社区昵称映射到游戏内物品名称（中文或英文均可），查询物品时自动识别。",
+    "items": {},
+    "default": {}
+  },
+  "monster_aliases": {
+    "description": "怪物别名",
+    "type": "dict",
+    "hint": "将社区昵称映射到游戏内怪物名称，查询怪物时自动识别。",
+    "items": {},
+    "default": {}
+  },
+  "skill_aliases": {
+    "description": "技能别名",
+    "type": "dict",
+    "hint": "将社区昵称映射到游戏内技能名称，查询技能时自动识别。",
+    "items": {},
+    "default": {}
+  },
+  "tag_aliases": {
+    "description": "标签别名",
+    "type": "dict",
+    "hint": "将社区昵称映射到游戏内标签名称，搜索时自动识别。",
+    "items": {},
+    "default": {}
+  },
+  "tier_aliases": {
+    "description": "品质别名",
+    "type": "dict",
+    "hint": "将社区昵称映射到品质英文名（Bronze/Silver/Gold/Diamond），搜索时自动识别。",
+    "items": {},
+    "default": {}
+  },
+  "size_aliases": {
+    "description": "尺寸别名",
+    "type": "dict",
+    "hint": "将社区昵称映射到尺寸名称，搜索时自动识别。",
+    "items": {},
+    "default": {}
+  }
+}

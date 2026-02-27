@@ -8,7 +8,7 @@ import aiohttp
 
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
-from astrbot.api import logger
+from astrbot.api import logger, AstrBotConfig
 import astrbot.api.message_components as Comp
 
 BUILDS_API = "https://bazaar-builds.net/wp-json/wp/v2"
@@ -81,10 +81,22 @@ TIER_MAP = {
 ALIAS_CATEGORIES = ["hero", "item", "monster", "skill", "tag", "tier", "size"]
 
 
+CONFIG_KEY_MAP = {
+    "hero": "hero_aliases",
+    "item": "item_aliases",
+    "monster": "monster_aliases",
+    "skill": "skill_aliases",
+    "tag": "tag_aliases",
+    "tier": "tier_aliases",
+    "size": "size_aliases",
+}
+
+
 @register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、阵容查询，图片卡片展示", "v1.0.3")
 class BazaarPlugin(Star):
-    def __init__(self, context: Context):
+    def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
+        self.config = config
         self.monsters = {}
         self.items = []
         self.skills = []
@@ -99,30 +111,50 @@ class BazaarPlugin(Star):
         return self._session
 
     def _load_aliases(self):
-        path = self.plugin_dir / "data" / "aliases.json"
-        try:
-            if path.exists():
-                with open(path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                self.aliases = {}
+        self.aliases = {}
+        if self.config:
+            for cat, config_key in CONFIG_KEY_MAP.items():
+                val = self.config.get(config_key, {})
+                self.aliases[cat] = dict(val) if isinstance(val, dict) else {}
+        else:
+            path = self.plugin_dir / "data" / "aliases.json"
+            try:
+                if path.exists():
+                    with open(path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    for cat in ALIAS_CATEGORIES:
+                        self.aliases[cat] = data.get(cat, {})
+                else:
+                    for cat in ALIAS_CATEGORIES:
+                        self.aliases[cat] = {}
+            except Exception as e:
+                logger.error(f"加载别名配置失败: {e}")
                 for cat in ALIAS_CATEGORIES:
-                    self.aliases[cat] = data.get(cat, {})
-            else:
-                self.aliases = {cat: {} for cat in ALIAS_CATEGORIES}
-        except Exception as e:
-            logger.error(f"加载别名配置失败: {e}")
-            self.aliases = {cat: {} for cat in ALIAS_CATEGORIES}
+                    self.aliases[cat] = {}
 
     def _save_aliases(self):
-        path = self.plugin_dir / "data" / "aliases.json"
-        try:
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(self.aliases, f, ensure_ascii=False, indent=2)
-            self._aliases_mtime = path.stat().st_mtime
-        except Exception as e:
-            logger.error(f"保存别名配置失败: {e}")
+        if self.config:
+            for cat, config_key in CONFIG_KEY_MAP.items():
+                self.config[config_key] = self.aliases.get(cat, {})
+            try:
+                self.config.save_config()
+            except Exception as e:
+                logger.error(f"保存别名配置失败: {e}")
+        else:
+            path = self.plugin_dir / "data" / "aliases.json"
+            try:
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(self.aliases, f, ensure_ascii=False, indent=2)
+            except Exception as e:
+                logger.error(f"保存别名配置失败: {e}")
 
     def _reload_aliases_if_changed(self):
+        if self.config:
+            old = self.aliases.copy()
+            self._load_aliases()
+            if self.aliases != old:
+                self._build_vocab()
+            return
         path = self.plugin_dir / "data" / "aliases.json"
         try:
             mtime = path.stat().st_mtime if path.exists() else 0
@@ -149,11 +181,12 @@ class BazaarPlugin(Star):
     async def initialize(self):
         self._load_data()
         self._load_aliases()
-        path = self.plugin_dir / "data" / "aliases.json"
-        try:
-            self._aliases_mtime = path.stat().st_mtime if path.exists() else 0
-        except OSError:
-            self._aliases_mtime = 0
+        if not self.config:
+            path = self.plugin_dir / "data" / "aliases.json"
+            try:
+                self._aliases_mtime = path.stat().st_mtime if path.exists() else 0
+            except OSError:
+                self._aliases_mtime = 0
         self._build_vocab()
         try:
             try:
