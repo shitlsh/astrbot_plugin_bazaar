@@ -55,6 +55,14 @@ def _resolve_search(results, query, name_func, not_found_msg):
     return None, f"找到{total}个匹配结果，请精确输入:\n" + "\n".join(names)
 
 
+def _extract_query(message_str: str, command_name: str) -> str:
+    text = message_str.strip()
+    for prefix in [f"/{command_name}", command_name]:
+        if text.lower().startswith(prefix.lower()):
+            return text[len(prefix):].strip()
+    return text
+
+
 @register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、阵容查询，图片卡片展示", "v1.0.1")
 class BazaarPlugin(Star):
     def __init__(self, context: Context):
@@ -422,7 +430,7 @@ class BazaarPlugin(Star):
     @filter.command("tbzmonster")
     async def cmd_monster(self, event: AstrMessageEvent):
         """查询怪物详细信息"""
-        query = event.message_str.strip()
+        query = _extract_query(event.message_str, "tbzmonster")
         if not query:
             yield event.plain_result("请输入怪物名称，例如: /tbzmonster 火灵")
             return
@@ -465,7 +473,7 @@ class BazaarPlugin(Star):
     @filter.command("tbzitem")
     async def cmd_item(self, event: AstrMessageEvent):
         """查询物品详细信息"""
-        query = event.message_str.strip()
+        query = _extract_query(event.message_str, "tbzitem")
         if not query:
             yield event.plain_result("请输入物品名称，例如: /tbzitem 短剑")
             return
@@ -533,7 +541,7 @@ class BazaarPlugin(Star):
     @filter.command("tbzskill")
     async def cmd_skill(self, event: AstrMessageEvent):
         """查询技能详细信息"""
-        query = event.message_str.strip()
+        query = _extract_query(event.message_str, "tbzskill")
         if not query:
             yield event.plain_result("请输入技能名称，例如: /tbzskill 热情如火")
             return
@@ -571,7 +579,7 @@ class BazaarPlugin(Star):
     @filter.command("tbzsearch")
     async def cmd_search(self, event: AstrMessageEvent):
         """搜索怪物、物品和技能"""
-        query = event.message_str.strip()
+        query = _extract_query(event.message_str, "tbzsearch")
         if not query:
             yield event.plain_result("请输入搜索关键词，例如: /tbzsearch 灼烧")
             return
@@ -618,7 +626,7 @@ class BazaarPlugin(Star):
     @filter.command("tbzitems")
     async def cmd_items_by_tag(self, event: AstrMessageEvent):
         """按标签筛选物品"""
-        tag = event.message_str.strip()
+        tag = _extract_query(event.message_str, "tbzitems")
 
         if not tag:
             all_tags = set()
@@ -664,7 +672,7 @@ class BazaarPlugin(Star):
     @filter.command("tbztier")
     async def cmd_items_by_tier(self, event: AstrMessageEvent):
         """按品质筛选物品"""
-        tier = event.message_str.strip()
+        tier = _extract_query(event.message_str, "tbztier")
 
         if not tier:
             yield event.plain_result(
@@ -705,7 +713,7 @@ class BazaarPlugin(Star):
     @filter.command("tbzhero")
     async def cmd_hero(self, event: AstrMessageEvent):
         """查询英雄专属物品和技能"""
-        query = event.message_str.strip()
+        query = _extract_query(event.message_str, "tbzhero")
         if not query:
             heroes = set()
             for item in self.items:
@@ -823,7 +831,7 @@ class BazaarPlugin(Star):
     @filter.command("tbzbuild")
     async def cmd_build(self, event: AstrMessageEvent):
         """查询物品推荐阵容"""
-        query = event.message_str.strip()
+        query = _extract_query(event.message_str, "tbzbuild")
         if not query:
             yield event.plain_result(
                 "请输入物品名称查询推荐阵容，例如:\n"

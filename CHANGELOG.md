@@ -15,6 +15,10 @@
   - `/bzhero` → `/tbzhero`
   - `/bzbuild` → `/tbzbuild`
 
+### Bug Fixes
+
+- 修复指令参数解析问题：`event.message_str` 在真实 AstrBot 框架中包含完整命令文本，导致命令名被当作查询参数的一部分。新增 `_extract_query()` 函数正确提取用户输入
+
 ### Improvements
 
 - 使用持久化 `aiohttp.ClientSession`，在插件初始化时创建、卸载时关闭，main.py 与 card_renderer.py 共享同一 Session，大幅减少网络连接开销
