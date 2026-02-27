@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.1.0
+
+### Features
+
+- 事件数据增强：从 `event_encounters.json` 提取英雄适用性和品质等级信息，为现有39条事件补充 `heroes` 和 `tier` 字段
+  - `/tbzevent` 输出新增适用英雄和品质等级显示
+  - `/tbzsearch` 支持按英雄过滤事件（如 `/tbzsearch hero:Jules` 会包含该英雄的事件）
+  - `bazaar_query_event` AI 工具输出包含英雄和品质信息
+- 新增 `/tbznews [数量]` 命令：从 Steam Store API 获取官方中文游戏更新公告
+  - 自动渲染为长图片卡片（暗色背景、标题+日期+正文+Steam链接）
+  - 多条公告使用合并转发消息发送
+  - 支持 BBCode 转纯文本（标题、列表、链接等）
+  - 默认显示1条，可通过参数或插件配置 `news_default_count` 调整
+- 新增 `bazaar_get_news` AI 工具：LLM 可自动查询最新游戏更新公告摘要
+- `/tbzupdate` 同步更新 `event_encounters.json` 数据
+
+### Improvements
+
+- AI 人格预设增强：新增 news 工具说明，工具绑定增至 8 个
+- 搜索结果中事件显示英雄标签和品质等级
+- `_conf_schema.json` 新增 `news_default_count` 配置项（默认值1，最大20）
+
 ## v1.0.6
 
 ### Features

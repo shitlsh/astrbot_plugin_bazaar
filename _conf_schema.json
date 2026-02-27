@@ -60,5 +60,11 @@
     "type": "int",
     "hint": "使用 /tbzbuild 查询阵容时，未指定数量时默认返回的结果条数（1-10）。",
     "default": 5
+  },
+  "news_default_count": {
+    "description": "游戏公告默认获取数量",
+    "type": "int",
+    "hint": "使用 /tbznews 查询游戏更新公告时，未指定数量时默认获取的条数（1-20）。",
+    "default": 1
   }
 }

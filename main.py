@@ -3,6 +3,7 @@ import json
 import os
 import re
 import html as html_module
+from datetime import datetime
 from pathlib import Path
 
 import aiohttp
@@ -92,7 +93,39 @@ DATA_FILES = {
     "monsters_db.json": f"{GITHUB_RAW}/monsters_db.json",
     "skills_db.json": f"{GITHUB_RAW}/skills_db.json",
     "event_detail.json": f"{GITHUB_RAW}/event_detail.json",
+    "event_encounters.json": f"{GITHUB_RAW}/event_encounters.json",
 }
+
+STEAM_NEWS_API = "https://store.steampowered.com/events/ajaxgetpartnereventspageable/"
+STEAM_APP_ID = 1617400
+DEFAULT_NEWS_COUNT = 1
+
+HERO_CN_MAP = {
+    "Common": "通用", "Dooley": "杜利", "Jules": "朱尔斯",
+    "Mak": "马克", "Pygmalien": "皮格马利翁", "Stelle": "斯黛拉", "Vanessa": "瓦妮莎",
+}
+
+
+def _strip_bbcode(text: str) -> str:
+    text = re.sub(r'\[previewyoutube[^\]]*\].*?\[/previewyoutube\]', '', text, flags=re.DOTALL)
+    text = re.sub(r'\[img\].*?\[/img\]', '', text, flags=re.DOTALL)
+    text = re.sub(r'\[url=[^\]]*\](.*?)\[/url\]', r'\1', text)
+    heading_map = {"h1": "# ", "h2": "## ", "h3": "### "}
+    for tag, prefix in heading_map.items():
+        text = re.sub(rf'\[{tag}\]\s*\[b\](.*?)\[/b\]\s*\[/{tag}\]', rf'\n{prefix}\1\n', text)
+        text = re.sub(rf'\[{tag}\](.*?)\[/{tag}\]', rf'\n{prefix}\1\n', text)
+    text = re.sub(r'\[b\](.*?)\[/b\]', r'\1', text)
+    text = re.sub(r'\[i\](.*?)\[/i\]', r'\1', text)
+    text = re.sub(r'\[u\](.*?)\[/u\]', r'\1', text)
+    text = re.sub(r'\[list\]', '\n', text)
+    text = re.sub(r'\[/list\]', '\n', text)
+    text = re.sub(r'\[\*\]', '\n- ', text)
+    text = re.sub(r'\[/p\]', '\n', text)
+    for tag in ['p', 'table', 'tr', 'td', 'th', 'strike', 'spoiler', 'noparse', 'code']:
+        text = re.sub(rf'\[/?{tag}[^\]]*\]', '', text)
+    text = re.sub(r'\[/?[a-zA-Z][^\]]*\]', '', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
 
 TIER_MAP = {
     "bronze": "Bronze", "silver": "Silver", "gold": "Gold", "diamond": "Diamond",
@@ -115,7 +148,7 @@ CONFIG_KEY_MAP = {
 }
 
 
-@register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、事件、阵容查询，图片卡片展示，AI 人格预设与工具自动调用", "v1.0.6")
+@register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、事件、阵容、更新公告查询，图片卡片展示，AI 人格预设与工具自动调用", "v1.1.0")
 class BazaarPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
@@ -260,11 +293,13 @@ class BazaarPlugin(Star):
             "- bazaar_query_skill: 查询技能详情（描述、适用英雄等）\n"
             "- bazaar_query_event: 查询事件选项和奖励\n"
             "- bazaar_search: 多条件搜索物品/怪物/技能/事件\n"
-            "- bazaar_query_build: 查询社区推荐阵容\n\n"
+            "- bazaar_query_build: 查询社区推荐阵容\n"
+            "- bazaar_get_news: 查询游戏最近的更新公告/补丁说明\n\n"
             "重要规则：\n"
             "- 当用户提到任何可能是游戏内容的名词时（如物品名、怪物名、英雄名），优先使用工具查询，不要凭空编造信息\n"
             "- 当用户问「怎么搭配」「怎么玩」「推荐阵容」时，使用 bazaar_query_build 工具\n"
             "- 当用户问某个东西「是什么」「有什么效果」时，先用 bazaar_query_item 查询\n"
+            "- 当用户问「最近更新了什么」「有什么新补丁」「更新公告」时，使用 bazaar_get_news 工具\n"
             "- 工具返回的是纯文本信息。如果用户想看图片卡片，建议他们使用 /tbzitem、/tbzmonster、/tbzskill 等命令\n"
             "- 在回复中整合工具返回的数据，并在末尾告知用户可以使用对应命令查看图片版本\n"
             "- 用中文回复玩家，语气友好专业\n"
@@ -283,6 +318,7 @@ class BazaarPlugin(Star):
             "bazaar_query_event",
             "bazaar_search",
             "bazaar_query_build",
+            "bazaar_get_news",
         ]
         try:
             pm = self.context.persona_manager
@@ -454,6 +490,49 @@ class BazaarPlugin(Star):
             except (json.JSONDecodeError, IOError) as e:
                 logger.error(f"加载数据失败 ({name}): {e}")
                 setattr(self, attr, default)
+
+        self._enrich_events(data_dir)
+
+    def _enrich_events(self, data_dir: Path):
+        enc_path = data_dir / "event_encounters.json"
+        if not enc_path.exists() or not self.events:
+            return
+        try:
+            with open(enc_path, "r", encoding="utf-8") as f:
+                encounters = json.load(f)
+        except (json.JSONDecodeError, IOError) as e:
+            logger.warning(f"加载 event_encounters.json 失败: {e}")
+            return
+
+        enc_map = {}
+        for enc in encounters:
+            iname = enc.get("InternalName", "").strip().lower()
+            title = enc.get("Localization", {}).get("Title", {}).get("Text", "").strip().lower()
+            info = {"heroes": enc.get("Heroes", []), "tier": enc.get("StartingTier", "")}
+            if iname:
+                enc_map[iname] = info
+            if title and title != iname:
+                enc_map[title] = info
+
+        matched = 0
+        for ev in self.events:
+            name_en = ev.get("name_en", "").strip().lower()
+            if not name_en:
+                continue
+            match = enc_map.get(name_en)
+            if not match:
+                candidates = [(k, v) for k, v in enc_map.items() if name_en in k]
+                if len(candidates) == 1:
+                    match = candidates[0][1]
+                elif len(candidates) > 1:
+                    logger.debug(f"事件匹配歧义 '{name_en}': {[c[0] for c in candidates]}，跳过子串匹配")
+            if match:
+                ev["heroes"] = match["heroes"]
+                ev["tier"] = match["tier"]
+                matched += 1
+
+        if matched:
+            logger.info(f"事件数据增强: {matched}/{len(self.events)} 条事件已补充英雄和品质信息")
 
     def _format_monster_info(self, key: str, monster: dict) -> str:
         name_zh = monster.get("name_zh", key)
@@ -701,7 +780,16 @@ class BazaarPlugin(Star):
         name = event_data.get("name", "")
         name_en = event_data.get("name_en", "")
 
-        lines = [f"🎲 【{name}】({name_en})", ""]
+        tier = event_data.get("tier", "")
+        tier_emoji = TIER_EMOJI.get(tier, "")
+        tier_str = f" {tier_emoji}{tier}" if tier else ""
+        lines = [f"🎲 【{name}】({name_en}){tier_str}", ""]
+
+        heroes = event_data.get("heroes", [])
+        if heroes:
+            hero_display = ", ".join(f"{HERO_CN_MAP.get(h, h)}({h})" for h in heroes)
+            lines.append(f"🦸 适用英雄: {hero_display}")
+            lines.append("")
 
         choices = event_data.get("choices", [])
         if choices:
@@ -775,10 +863,17 @@ class BazaarPlugin(Star):
             msg += "\n💡 请使用 /tbzsearch 搜索。"
         return msg
 
-    def _search_events(self, keyword: str) -> list:
+    def _search_events(self, keyword: str, heroes: list = None) -> list:
         results = []
-        kw = keyword.lower()
+        kw = keyword.lower() if keyword else ""
         for ev in self.events:
+            if heroes:
+                ev_heroes = [h.lower() for h in ev.get("heroes", [])]
+                if not any(h.lower() in ev_heroes for h in heroes):
+                    continue
+            if not kw:
+                results.append(ev)
+                continue
             if (kw in ev.get("name", "").lower() or
                 kw in ev.get("name_en", "").lower()):
                 results.append(ev)
@@ -858,7 +953,10 @@ class BazaarPlugin(Star):
             "  直接连写: /tbzsearch 杜利中型灼烧\n"
             "  空格分隔: /tbzsearch 马克 黄金 武器\n"
             "  前缀语法: /tbzsearch tag:Weapon hero:Mak\n"
+            "  英雄事件: /tbzsearch hero:Jules (含该英雄事件)\n"
             "  无参数: /tbzsearch (显示搜索帮助)\n\n"
+            "/tbznews [数量] - 查询游戏官方更新公告(图片)\n"
+            "  示例: /tbznews 或 /tbznews 3\n\n"
             "/tbzbuild <物品名> [数量] - 查询推荐阵容\n"
             "  示例: /tbzbuild 符文匕首\n\n"
             "/tbzalias - 别名管理(查看/添加/删除)\n"
@@ -868,7 +966,7 @@ class BazaarPlugin(Star):
             "/tbzupdate - 从远端更新游戏数据\n\n"
             "/tbzhelp - 显示此帮助信息\n"
             "━━━━━━━━━━━━━━━━━━\n"
-            "数据来源: BazaarHelper | bazaar-builds.net\n\n"
+            "数据来源: BazaarHelper | bazaar-builds.net | Steam\n\n"
             "💡 AI 工具: 本插件支持 AI 自动调用，需要 AstrBot 配置支持函数调用的 LLM 模型"
         )
         yield event.plain_result(help_text)
@@ -1219,7 +1317,9 @@ class BazaarPlugin(Star):
         item_results = self._filter_items(conditions)
         skill_results = self._filter_skills(conditions) if not conditions["tiers"] and not conditions["tags"] and not conditions.get("sizes") else []
         monster_results = self._search_monsters(conditions["keyword"]) if conditions["keyword"] and not has_filters else []
-        event_results = self._search_events(conditions["keyword"]) if conditions["keyword"] and not has_filters else []
+        event_heroes = conditions["heroes"] if conditions["heroes"] else None
+        event_kw = conditions["keyword"] if conditions["keyword"] else ""
+        event_results = self._search_events(event_kw, event_heroes) if (event_kw or event_heroes) else []
 
         if not monster_results and not item_results and not skill_results and not event_results:
             yield event.plain_result(f"未找到与「{query}」相关的结果。\n使用 /tbzsearch 查看搜索帮助。")
@@ -1299,7 +1399,13 @@ class BazaarPlugin(Star):
             lines = [f"🎲 事件 ({len(event_results)}个):"]
             for ev in event_results:
                 choices_count = len(ev.get("choices", []))
-                lines.append(f"  • {ev.get('name', '')}({ev.get('name_en', '')}) - {choices_count}个选项")
+                ev_heroes = ev.get("heroes", [])
+                hero_tag = ""
+                if ev_heroes and ev_heroes != ["Common"]:
+                    hero_tag = f" [{','.join(ev_heroes)}]"
+                tier = ev.get("tier", "")
+                tier_emoji = TIER_EMOJI.get(tier, "")
+                lines.append(f"  {tier_emoji} {ev.get('name', '')}({ev.get('name_en', '')}){hero_tag} - {choices_count}个选项")
             nodes.append(Comp.Node(
                 name="大巴扎小助手", uin="0",
                 content=[Comp.Plain("\n".join(lines))]
@@ -1556,6 +1662,122 @@ class BazaarPlugin(Star):
             logger.warning(f"查询阵容失败: {e}")
             return []
 
+    async def _fetch_news(self, count: int = 1) -> list:
+        session = await self._get_session()
+        params = {
+            "clan_accountid": 0,
+            "appid": STEAM_APP_ID,
+            "offset": 0,
+            "count": count,
+            "l": "schinese",
+        }
+        try:
+            async with session.get(STEAM_NEWS_API, params=params, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                if resp.status != 200:
+                    logger.warning(f"Steam 新闻 API 返回 HTTP {resp.status}")
+                    return []
+                data = await resp.json(content_type=None)
+        except Exception as e:
+            logger.warning(f"获取 Steam 新闻失败: {e}")
+            return []
+
+        events_list = data.get("events", [])
+        articles = []
+        for ev_data in events_list:
+            gid = ev_data.get("gid", "")
+            title = ev_data.get("event_name", "")
+            announcement = ev_data.get("announcement_body", {})
+            if not title:
+                title = announcement.get("headline", "")
+            body_bbcode = announcement.get("body", "")
+            body_text = _strip_bbcode(body_bbcode)
+            post_time = ev_data.get("rtime32_start_time", 0)
+            date_str = datetime.utcfromtimestamp(post_time).strftime("%Y-%m-%d") if post_time else ""
+            url = f"https://store.steampowered.com/news/app/{STEAM_APP_ID}/view/{gid}?l=schinese"
+            articles.append({
+                "title": title,
+                "date": date_str,
+                "body": body_text,
+                "url": url,
+                "gid": gid,
+            })
+        return articles
+
+    @filter.command("tbznews")
+    async def cmd_news(self, event: AstrMessageEvent):
+        """查询游戏官方更新公告"""
+        query = _extract_query(event.message_str, "tbznews")
+
+        if self.config:
+            default_count = max(1, min(int(self.config.get("news_default_count", DEFAULT_NEWS_COUNT)), 20))
+        else:
+            default_count = DEFAULT_NEWS_COUNT
+
+        count = default_count
+        if query and query.strip().isdigit():
+            count = max(1, min(int(query.strip()), 20))
+
+        yield event.plain_result(f"⏳ 正在从 Steam 获取最新 {count} 条公告...")
+
+        articles = await self._fetch_news(count)
+        if not articles:
+            yield event.plain_result("❌ 暂时无法获取游戏更新公告，请稍后再试。")
+            return
+
+        if len(articles) == 1:
+            article = articles[0]
+            try:
+                img_bytes = await self.renderer.render_news_card(
+                    article["title"], article["date"], article["body"], article["url"]
+                )
+                yield event.chain_result([Comp.Image.fromBytes(img_bytes)])
+            except Exception as e:
+                logger.warning(f"新闻卡片渲染失败: {e}")
+                preview = article["body"][:1000]
+                yield event.plain_result(
+                    f"📰 {article['title']}\n📅 {article['date']}\n\n{preview}\n\n🔗 {article['url']}"
+                )
+            return
+
+        nodes = []
+        nodes.append(Comp.Node(
+            name="大巴扎小助手", uin="0",
+            content=[Comp.Plain(f"📰 The Bazaar 最新公告 (共{len(articles)}条)")]
+        ))
+
+        for i, article in enumerate(articles, 1):
+            try:
+                img_bytes = await self.renderer.render_news_card(
+                    article["title"], article["date"], article["body"], article["url"]
+                )
+                nodes.append(Comp.Node(
+                    name="大巴扎小助手", uin="0",
+                    content=[
+                        Comp.Image.fromBytes(img_bytes),
+                        Comp.Plain(f"━━ {i}. {article['title']} ({article['date']}) ━━"),
+                    ]
+                ))
+            except Exception as e:
+                logger.warning(f"新闻卡片渲染失败 ({article['title']}): {e}")
+                preview = article["body"][:500]
+                nodes.append(Comp.Node(
+                    name="大巴扎小助手", uin="0",
+                    content=[Comp.Plain(
+                        f"━━ {i}. {article['title']} ━━\n📅 {article['date']}\n\n{preview}\n\n🔗 {article['url']}"
+                    )]
+                ))
+
+        try:
+            yield event.chain_result([Comp.Nodes(nodes)])
+        except Exception as e:
+            logger.warning(f"合并转发发送失败，回退逐条发送: {e}")
+            for node in nodes:
+                for item in node.content:
+                    if isinstance(item, Comp.Plain):
+                        yield event.plain_result(item.text)
+                    else:
+                        yield event.chain_result([item])
+
     @filter.command("tbzbuild")
     async def cmd_build(self, event: AstrMessageEvent):
         """查询物品推荐阵容"""
@@ -1775,7 +1997,34 @@ class BazaarPlugin(Star):
                 yield event.plain_result(msg)
                 return
 
-        yield event.plain_result(self._format_event_info(found))
+        info = self._format_event_info(found)
+        info += "\n💡 使用 /tbzevent " + (found.get("name") or found.get("name_en", "")) + " 查看详情"
+        yield event.plain_result(info)
+
+    @filter.llm_tool(name="bazaar_get_news")
+    async def tool_get_news(self, event: AstrMessageEvent, count: int = 1):
+        '''查询 The Bazaar (大巴扎) 游戏的最新官方更新公告和补丁说明。当用户询问游戏最近更新了什么、有什么新补丁、改动内容、版本更新、changelog 时，请调用此工具。返回 Steam 官方中文翻译的更新公告摘要。
+
+        Args:
+            count(int): 返回公告数量，默认1，范围1-5
+        '''
+        count = max(1, min(count, 5))
+        articles = await self._fetch_news(count)
+        if not articles:
+            yield event.plain_result("暂时无法获取游戏更新公告，请稍后再试。")
+            return
+
+        lines = []
+        for i, article in enumerate(articles, 1):
+            lines.append(f"{i}. {article['title']}")
+            lines.append(f"   日期: {article['date']}")
+            body_preview = article['body'][:500]
+            lines.append(f"   内容摘要:\n{body_preview}")
+            lines.append(f"   链接: {article['url']}")
+            lines.append("")
+
+        lines.append("💡 使用 /tbznews 查看完整图片版公告")
+        yield event.plain_result("\n".join(lines))
 
     @filter.llm_tool(name="bazaar_search")
     async def tool_search(self, event: AstrMessageEvent, query: str):
@@ -1791,7 +2040,9 @@ class BazaarPlugin(Star):
         item_results = self._filter_items(conditions)
         skill_results = self._filter_skills(conditions) if not conditions["tiers"] and not conditions["tags"] and not conditions.get("sizes") else []
         monster_results = self._search_monsters(conditions["keyword"]) if conditions["keyword"] and not has_filters else []
-        event_results = self._search_events(conditions["keyword"]) if conditions["keyword"] and not has_filters else []
+        event_heroes = conditions["heroes"] if conditions["heroes"] else None
+        event_kw = conditions["keyword"] if conditions["keyword"] else ""
+        event_results = self._search_events(event_kw, event_heroes) if (event_kw or event_heroes) else []
 
         if not monster_results and not item_results and not skill_results and not event_results:
             yield event.plain_result(f"未找到与「{query}」相关的结果。")
@@ -1827,7 +2078,11 @@ class BazaarPlugin(Star):
         if event_results:
             lines.append(f"\n事件 ({len(event_results)}个):")
             for ev in event_results[:10]:
-                lines.append(f"  - {ev.get('name', '')}({ev.get('name_en', '')})")
+                ev_heroes = ev.get("heroes", [])
+                hero_tag = f" [{','.join(ev_heroes)}]" if ev_heroes and ev_heroes != ["Common"] else ""
+                tier = ev.get("tier", "")
+                tier_str = f" {tier}" if tier else ""
+                lines.append(f"  - {ev.get('name', '')}({ev.get('name_en', '')}){hero_tag}{tier_str}")
             if len(event_results) > 10:
                 lines.append(f"  ... 还有{len(event_results) - 10}个")
 

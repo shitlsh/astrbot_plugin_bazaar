@@ -741,6 +741,84 @@ class CardRenderer:
         img.save(buf_skill, format="PNG")
         return buf_skill.getvalue()
 
+    async def render_news_card(self, title: str, date_str: str, body: str, url: str) -> bytes:
+        font_title = self._font(24 * SCALE)
+        font_subtitle = self._font(FONT_SIZE_SUBTITLE)
+        font_body = self._font(15 * SCALE)
+        font_small = self._font(FONT_SIZE_SMALL)
+        font_link = self._font(FONT_SIZE_LINK)
+
+        news_width = BUILD_CARD_WIDTH
+        content_width = news_width - PADDING * 2
+
+        header_h = 70 * SCALE
+
+        body_lines = self._wrap_text(body, font_body, content_width - INDENT)
+        max_body_lines = 200
+        if len(body_lines) > max_body_lines:
+            body_lines = body_lines[:max_body_lines]
+            body_lines.append("...")
+        body_h = len(body_lines) * LINE_HEIGHT_BODY + SECTION_GAP
+
+        footer_h = LINE_HEIGHT_LINK + PADDING
+
+        total_height = header_h + body_h + footer_h + PADDING * 3
+        img = Image.new("RGBA", (news_width, total_height), COLORS["bg"])
+        draw = ImageDraw.Draw(img)
+
+        y = PADDING
+        self._draw_rounded_rect(draw, (0, 0, news_width, header_h + PADDING), HEADER_RADIUS, COLORS["header_bg"])
+
+        title_lines = self._wrap_text(title, font_title, content_width - 10 * SCALE)
+        for tl in title_lines[:2]:
+            draw.text((PADDING, y + 6 * SCALE), tl, font=font_title, fill=COLORS["text"])
+            y += 30 * SCALE
+
+        draw.text((PADDING, y + 4 * SCALE), f"{date_str}", font=font_small, fill=COLORS["text_dim"])
+
+        y = header_h + PADDING + SECTION_GAP
+
+        section_color_map = {
+            "h1": COLORS["accent"],
+            "h2": COLORS["green"],
+            "h3": COLORS["orange"],
+        }
+        current_color = COLORS["text"]
+
+        for line in body_lines:
+            stripped = line.strip()
+            is_heading = False
+            for prefix, color in [("## ", "h2"), ("### ", "h3"), ("# ", "h1")]:
+                if stripped.startswith(prefix):
+                    heading_text = stripped[len(prefix):]
+                    draw.text((PADDING + INDENT, y), heading_text, font=font_subtitle, fill=section_color_map[color])
+                    y += LINE_HEIGHT_BODY
+                    is_heading = True
+                    break
+            if is_heading:
+                continue
+
+            if stripped.startswith("- ") or stripped.startswith("* "):
+                draw.text((PADDING + INDENT, y), stripped, font=font_body, fill=COLORS["text"])
+            elif stripped == "":
+                pass
+            else:
+                draw.text((PADDING + INDENT, y), stripped, font=font_body, fill=COLORS["text"])
+            y += LINE_HEIGHT_BODY
+
+        y += SECTION_GAP
+        self._draw_divider(draw, y, news_width)
+        y += SECTION_GAP
+
+        url_lines = self._wrap_text(url, font_link, content_width)
+        for ul in url_lines[:2]:
+            draw.text((PADDING, y), ul, font=font_link, fill=COLORS["accent"])
+            y += LINE_HEIGHT_LINK
+
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return buf.getvalue()
+
     async def render_build_card(self, query: str, search_term: str, builds: list) -> bytes:
         font_title = self._font(24 * SCALE)
         font_subtitle = self._font(FONT_SIZE_SUBTITLE)
