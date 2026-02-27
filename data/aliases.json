@@ -1,0 +1,23 @@
+{
+  "hero": {
+    "猪猪": "Pygmalien",
+    "猪": "Pygmalien",
+    "猪哥": "Pygmalien",
+    "鸡煲": "Dooley",
+    "机宝": "Dooley",
+    "海盗": "Vanessa",
+    "海盗姐": "Vanessa",
+    "黑妹": "Stelle",
+    "厨子": "Jules",
+    "大厨": "Jules",
+    "厨师": "Jules",
+    "中立": "Common",
+    "通用": "Common"
+  },
+  "item": {},
+  "monster": {},
+  "skill": {},
+  "tag": {},
+  "tier": {},
+  "size": {}
+}

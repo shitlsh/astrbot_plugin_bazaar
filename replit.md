@@ -23,6 +23,7 @@
     ├── items_db.json      # 物品数据库 (958条)
     ├── monsters_db.json   # 怪物数据库 (120条)
     ├── skills_db.json     # 技能数据库 (448条)
+    ├── aliases.json       # 别名配置（持久化）
     └── cache/             # 图片缓存目录（自动创建）
 ```
 
@@ -33,7 +34,15 @@
 - `/tbzskill <名称>` - 查询技能信息（输出图片卡片）
 - `/tbzsearch <条件>` - 多条件搜索（支持 tag:/tier:/hero: 前缀组合，合并转发输出）
 - `/tbzbuild <物品名> [数量]` - 查询推荐阵容（默认3条，最多10条，合并转发输出）
+- `/tbzalias` - 别名管理（list/add/del，持久化到 aliases.json）
 - `/tbzupdate` - 从 BazaarHelper 仓库更新游戏数据
+
+## 别名系统
+- 别名配置持久化到 `data/aliases.json`，支持 7 种分类: hero, item, monster, skill, tag, tier, size
+- 命令管理: `/tbzalias add hero 猪猪 Pygmalien` / `/tbzalias del hero 猪猪` / `/tbzalias list`
+- hero/tag/tier/size 别名自动注入 `_build_vocab()` 词汇表，搜索时智能分词可识别
+- item/monster/skill 别名用于 `_resolve_alias()`，在查询命令中自动替换为目标名称
+- 命令行和后台文件两种方式修改后数据保持一致（均读写同一 aliases.json）
 
 ## 图片卡片渲染
 - 使用 Pillow 生成深色主题 PNG 卡片

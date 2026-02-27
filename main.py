@@ -78,13 +78,17 @@ TIER_MAP = {
 }
 
 
-@register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、阵容查询，图片卡片展示", "v1.0.2")
+ALIAS_CATEGORIES = ["hero", "item", "monster", "skill", "tag", "tier", "size"]
+
+
+@register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、阵容查询，图片卡片展示", "v1.0.3")
 class BazaarPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
         self.monsters = {}
         self.items = []
         self.skills = []
+        self.aliases: dict[str, dict[str, str]] = {}
         self.plugin_dir = Path(os.path.dirname(os.path.abspath(__file__)))
         self.renderer = None
         self._session: aiohttp.ClientSession | None = None
@@ -94,8 +98,62 @@ class BazaarPlugin(Star):
             self._session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20))
         return self._session
 
+    def _load_aliases(self):
+        path = self.plugin_dir / "data" / "aliases.json"
+        try:
+            if path.exists():
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                self.aliases = {}
+                for cat in ALIAS_CATEGORIES:
+                    self.aliases[cat] = data.get(cat, {})
+            else:
+                self.aliases = {cat: {} for cat in ALIAS_CATEGORIES}
+        except Exception as e:
+            logger.error(f"加载别名配置失败: {e}")
+            self.aliases = {cat: {} for cat in ALIAS_CATEGORIES}
+
+    def _save_aliases(self):
+        path = self.plugin_dir / "data" / "aliases.json"
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(self.aliases, f, ensure_ascii=False, indent=2)
+            self._aliases_mtime = path.stat().st_mtime
+        except Exception as e:
+            logger.error(f"保存别名配置失败: {e}")
+
+    def _reload_aliases_if_changed(self):
+        path = self.plugin_dir / "data" / "aliases.json"
+        try:
+            mtime = path.stat().st_mtime if path.exists() else 0
+        except OSError:
+            return
+        if mtime != getattr(self, "_aliases_mtime", 0):
+            self._load_aliases()
+            self._aliases_mtime = mtime
+            self._build_vocab()
+
+    def _resolve_alias(self, query: str) -> str:
+        self._reload_aliases_if_changed()
+        q = query.strip()
+        ql = q.lower()
+        for cat in ("item", "monster", "skill"):
+            for alias, target in self.aliases.get(cat, {}).items():
+                if ql == alias.lower():
+                    return target
+        for alias, target in self.aliases.get("hero", {}).items():
+            if ql == alias.lower():
+                return target
+        return q
+
     async def initialize(self):
         self._load_data()
+        self._load_aliases()
+        path = self.plugin_dir / "data" / "aliases.json"
+        try:
+            self._aliases_mtime = path.stat().st_mtime if path.exists() else 0
+        except OSError:
+            self._aliases_mtime = 0
         self._build_vocab()
         try:
             try:
@@ -135,9 +193,12 @@ class BazaarPlugin(Star):
                         p = p.strip()
                         if p and len(p) >= 2:
                             vocab[p.lower()] = ("tag", p)
-        hero_aliases = {"中立": "Common", "通用": "Common", "common": "Common"}
-        for alias, canonical in hero_aliases.items():
-            vocab[alias] = ("hero", canonical)
+        for cat in ALIAS_CATEGORIES:
+            vtype = cat
+            if cat in ("item", "monster", "skill"):
+                continue
+            for alias, target in self.aliases.get(cat, {}).items():
+                vocab[alias.lower()] = (vtype, target)
         for k, v in TIER_MAP.items():
             if len(k) >= 2:
                 vocab[k] = ("tier", v)
@@ -513,6 +574,10 @@ class BazaarPlugin(Star):
             "  无参数: /tbzsearch (显示搜索帮助)\n\n"
             "/tbzbuild <物品名> [数量] - 查询推荐阵容\n"
             "  示例: /tbzbuild 符文匕首\n\n"
+            "/tbzalias - 别名管理(查看/添加/删除)\n"
+            "  查看: /tbzalias list [分类]\n"
+            "  添加: /tbzalias add hero 猪猪 Pygmalien\n"
+            "  删除: /tbzalias del hero 猪猪\n\n"
             "/tbzupdate - 从远端更新游戏数据\n\n"
             "/tbzhelp - 显示此帮助信息\n"
             "━━━━━━━━━━━━━━━━━━\n"
@@ -528,6 +593,7 @@ class BazaarPlugin(Star):
             yield event.plain_result("请输入怪物名称，例如: /tbzmonster 火灵")
             return
 
+        query = self._resolve_alias(query)
         kw = query.lower()
         found_key = None
         found_monster = None
@@ -571,6 +637,7 @@ class BazaarPlugin(Star):
             yield event.plain_result("请输入物品名称，例如: /tbzitem 短剑")
             return
 
+        query = self._resolve_alias(query)
         kw = query.lower()
         found = None
 
@@ -639,6 +706,7 @@ class BazaarPlugin(Star):
             yield event.plain_result("请输入技能名称，例如: /tbzskill 热情如火")
             return
 
+        query = self._resolve_alias(query)
         kw = query.lower()
         found = None
 
@@ -819,6 +887,7 @@ class BazaarPlugin(Star):
     @filter.command("tbzsearch")
     async def cmd_search(self, event: AstrMessageEvent):
         """多条件搜索怪物、物品和技能"""
+        self._reload_aliases_if_changed()
         query = _extract_query(event.message_str, "tbzsearch")
         if not query:
             yield event.plain_result(self._get_search_help())
@@ -960,6 +1029,91 @@ class BazaarPlugin(Star):
             f"📊 当前数据: {len(self.monsters)}怪物 | {len(self.items)}物品 | {len(self.skills)}技能"
         )
         yield event.plain_result(summary)
+
+    @filter.command("tbzalias")
+    async def cmd_alias(self, event: AstrMessageEvent):
+        """管理别名配置"""
+        query = _extract_query(event.message_str, "tbzalias")
+        if not query:
+            lines = ["📖 别名管理\n━━━━━━━━━━━━━━━━━━"]
+            lines.append("用法:")
+            lines.append("  /tbzalias list [分类] - 查看别名列表")
+            lines.append("  /tbzalias add <分类> <别名> <目标> - 添加别名")
+            lines.append("  /tbzalias del <分类> <别名> - 删除别名")
+            lines.append("")
+            lines.append(f"可用分类: {', '.join(ALIAS_CATEGORIES)}")
+            lines.append("")
+            lines.append("示例:")
+            lines.append("  /tbzalias list hero")
+            lines.append("  /tbzalias add hero 猪猪 Pygmalien")
+            lines.append("  /tbzalias del hero 猪猪")
+            total = sum(len(v) for v in self.aliases.values())
+            lines.append(f"\n当前共 {total} 条别名")
+            yield event.plain_result("\n".join(lines))
+            return
+
+        parts = query.split(None, 3)
+        action = parts[0].lower()
+
+        if action == "list":
+            cat = parts[1].lower() if len(parts) > 1 else None
+            if cat and cat not in ALIAS_CATEGORIES:
+                yield event.plain_result(f"未知分类「{cat}」，可用分类: {', '.join(ALIAS_CATEGORIES)}")
+                return
+            lines = ["📖 别名列表\n━━━━━━━━━━━━━━━━━━"]
+            cats = [cat] if cat else ALIAS_CATEGORIES
+            for c in cats:
+                entries = self.aliases.get(c, {})
+                if entries:
+                    lines.append(f"\n【{c}】({len(entries)}条):")
+                    for alias, target in sorted(entries.items()):
+                        lines.append(f"  {alias} → {target}")
+            if len(lines) == 1:
+                lines.append("\n暂无别名配置")
+            yield event.plain_result("\n".join(lines))
+            return
+
+        if action == "add":
+            if len(parts) < 4:
+                yield event.plain_result("用法: /tbzalias add <分类> <别名> <目标>\n示例: /tbzalias add hero 猪猪 Pygmalien")
+                return
+            cat = parts[1].lower()
+            alias_name = parts[2]
+            target = parts[3]
+            if cat not in ALIAS_CATEGORIES:
+                yield event.plain_result(f"未知分类「{cat}」，可用分类: {', '.join(ALIAS_CATEGORIES)}")
+                return
+            if cat not in self.aliases:
+                self.aliases[cat] = {}
+            old = self.aliases[cat].get(alias_name)
+            self.aliases[cat][alias_name] = target
+            self._save_aliases()
+            self._build_vocab()
+            if old:
+                yield event.plain_result(f"✅ 已更新别名 [{cat}] {alias_name} → {target} (原: {old})")
+            else:
+                yield event.plain_result(f"✅ 已添加别名 [{cat}] {alias_name} → {target}")
+            return
+
+        if action in ("del", "delete", "rm", "remove"):
+            if len(parts) < 3:
+                yield event.plain_result("用法: /tbzalias del <分类> <别名>\n示例: /tbzalias del hero 猪猪")
+                return
+            cat = parts[1].lower()
+            alias_name = parts[2]
+            if cat not in ALIAS_CATEGORIES:
+                yield event.plain_result(f"未知分类「{cat}」，可用分类: {', '.join(ALIAS_CATEGORIES)}")
+                return
+            if cat in self.aliases and alias_name in self.aliases[cat]:
+                old_target = self.aliases[cat].pop(alias_name)
+                self._save_aliases()
+                self._build_vocab()
+                yield event.plain_result(f"✅ 已删除别名 [{cat}] {alias_name} → {old_target}")
+            else:
+                yield event.plain_result(f"未找到别名 [{cat}] {alias_name}")
+            return
+
+        yield event.plain_result("未知操作，请使用 list/add/del。输入 /tbzalias 查看帮助。")
 
     def _translate_item_name(self, name_cn: str) -> str:
         for item in self.items:
