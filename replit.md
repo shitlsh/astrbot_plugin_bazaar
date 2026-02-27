@@ -45,9 +45,10 @@
 - 需要中文字体支持（WenQuanYi Zen Hei）
 
 ## 阵容查询
-- `/bzbuild` 通过 bazaar-builds.net 的 WordPress REST API 搜索阵容
+- `/tbzbuild` 通过 bazaar-builds.net 的 WordPress REST API 搜索阵容
 - 支持中文物品名自动翻译为英文进行搜索
 - 默认返回3条结果，用户可指定1-10条
+- 结果以合并转发消息(Comp.Nodes)打包发送，避免刷屏；不支持的平台自动回退逐条发送
 - API端点: `https://bazaar-builds.net/wp-json/wp/v2/posts?search=...`
 
 ## 架构要点

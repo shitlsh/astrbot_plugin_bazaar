@@ -868,28 +868,53 @@ class BazaarPlugin(Star):
         header = f"🏗️ 「{query}」推荐阵容 (共{len(builds)}条)"
         if search_term != query:
             header += f"\n🔍 搜索: {search_term}"
-        yield event.plain_result(header)
+
+        nodes = []
+        nodes.append(Comp.Node(
+            name="大巴扎小助手",
+            uin="0",
+            content=[Comp.Plain(header)]
+        ))
 
         for i, build in enumerate(builds, 1):
             caption = f"━━ {i}. {build['title']} ━━\n📅 {build['date']}\n🔗 {build['link']}"
+            node_content = []
 
             if build.get("image_url"):
                 try:
                     img_bytes = await self._download_image(build["image_url"])
                     if img_bytes:
-                        yield event.chain_result([Comp.Image.fromBytes(img_bytes)])
-                        yield event.plain_result(caption)
-                        continue
+                        node_content.append(Comp.Image.fromBytes(img_bytes))
                 except Exception as e:
                     logger.debug(f"阵容图片下载失败: {e}")
 
-            if build.get("excerpt"):
+            if not node_content and build.get("excerpt"):
                 caption += f"\n💬 {build['excerpt']}"
-            yield event.plain_result(caption)
 
-        yield event.plain_result(
-            f"💡 更多阵容: https://bazaar-builds.net/?s={search_term.replace(' ', '+')}"
-        )
+            node_content.append(Comp.Plain(caption))
+            nodes.append(Comp.Node(
+                name="大巴扎小助手",
+                uin="0",
+                content=node_content
+            ))
+
+        more_url = f"https://bazaar-builds.net/?s={search_term.replace(' ', '+')}"
+        nodes.append(Comp.Node(
+            name="大巴扎小助手",
+            uin="0",
+            content=[Comp.Plain(f"💡 更多阵容: {more_url}")]
+        ))
+
+        try:
+            yield event.chain_result([Comp.Nodes(nodes)])
+        except Exception as e:
+            logger.warning(f"合并转发发送失败，回退逐条发送: {e}")
+            for node in nodes:
+                for item in node.content:
+                    if isinstance(item, Comp.Plain):
+                        yield event.plain_result(item.text)
+                    else:
+                        yield event.chain_result([item])
 
     async def terminate(self):
         if self._session and not self._session.closed:
