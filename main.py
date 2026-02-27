@@ -114,12 +114,26 @@ class BazaarPlugin(Star):
             self._session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20))
         return self._session
 
+    def _parse_alias_value(self, val) -> dict:
+        if isinstance(val, dict):
+            return dict(val)
+        if isinstance(val, str):
+            val = val.strip()
+            if val:
+                try:
+                    parsed = json.loads(val)
+                    if isinstance(parsed, dict):
+                        return parsed
+                except (json.JSONDecodeError, ValueError):
+                    logger.warning(f"别名配置 JSON 解析失败: {val[:100]}")
+        return {}
+
     def _load_aliases(self):
         self.aliases = {}
         if self.config:
             for cat, config_key in CONFIG_KEY_MAP.items():
                 val = self.config.get(config_key, {})
-                self.aliases[cat] = dict(val) if isinstance(val, dict) else {}
+                self.aliases[cat] = self._parse_alias_value(val)
         else:
             path = self.plugin_dir / "data" / "aliases.json"
             try:
@@ -139,7 +153,7 @@ class BazaarPlugin(Star):
     def _save_aliases(self):
         if self.config:
             for cat, config_key in CONFIG_KEY_MAP.items():
-                self.config[config_key] = self.aliases.get(cat, {})
+                self.config[config_key] = json.dumps(self.aliases.get(cat, {}), ensure_ascii=False, indent=2)
             try:
                 self.config.save_config()
             except Exception as e:
