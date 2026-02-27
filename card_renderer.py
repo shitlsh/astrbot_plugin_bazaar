@@ -341,7 +341,7 @@ class CardRenderer:
                 y += SECTION_GAP
 
             elif section_name == "skills":
-                draw.text((PADDING, y), "⚔ 技能", font=font_subtitle, fill=COLORS["accent"])
+                draw.text((PADDING, y), "【技能】", font=font_subtitle, fill=COLORS["accent"])
                 y += LINE_HEIGHT_SUBTITLE + SECTION_GAP
                 for s in skills[:6]:
                     name = s.get("name", s.get("name_en", ""))
@@ -372,7 +372,7 @@ class CardRenderer:
                 y += SECTION_GAP
 
             elif section_name == "items":
-                draw.text((PADDING, y), "🎒 物品", font=font_subtitle, fill=COLORS["green"])
+                draw.text((PADDING, y), "【物品】", font=font_subtitle, fill=COLORS["green"])
                 y += LINE_HEIGHT_SUBTITLE + SECTION_GAP
                 seen2 = set()
                 count = 0
@@ -523,7 +523,7 @@ class CardRenderer:
                     wrapped_t = self._wrap_text(f"→ {target}", font_small, content_width - INDENT_DEEP)
                     quests_h += len(wrapped_t) * LINE_HEIGHT_SMALL
                 if reward:
-                    wrapped_r = self._wrap_text(f"✨ {reward}", font_small, content_width - INDENT_DEEP)
+                    wrapped_r = self._wrap_text(f"=> {reward}", font_small, content_width - INDENT_DEEP)
                     quests_h += len(wrapped_r) * LINE_HEIGHT_SMALL
                 quests_h += SKILL_DESC_GAP
             sections_height += quests_h + SECTION_GAP
@@ -557,7 +557,7 @@ class CardRenderer:
         y = header_h + PADDING + SECTION_GAP
 
         if active_skills:
-            draw.text((PADDING, y), "⚔ 主动技能", font=font_subtitle, fill=COLORS["accent"])
+            draw.text((PADDING, y), "【主动技能】", font=font_subtitle, fill=COLORS["accent"])
             y += LINE_HEIGHT_SUBTITLE + SECTION_GAP
             for sk in active_skills[:4]:
                 txt = _get_skill_text(sk)
@@ -567,7 +567,7 @@ class CardRenderer:
                 y += SKILL_DESC_GAP
 
         if passive_skills:
-            draw.text((PADDING, y), "🛡 被动技能", font=font_subtitle, fill=COLORS["purple"])
+            draw.text((PADDING, y), "【被动技能】", font=font_subtitle, fill=COLORS["purple"])
             y += LINE_HEIGHT_SUBTITLE + SECTION_GAP
             for sk in passive_skills[:4]:
                 txt = _get_skill_text(sk)
@@ -588,7 +588,7 @@ class CardRenderer:
             y += SECTION_GAP
 
         if stats:
-            draw.text((PADDING, y), "📈 数值", font=font_subtitle, fill=COLORS["orange"])
+            draw.text((PADDING, y), "【数值】", font=font_subtitle, fill=COLORS["orange"])
             y += LINE_HEIGHT_SUBTITLE + SECTION_GAP
             for label, val, tiers_str in stats:
                 val_text = f"{label}: {val}"
@@ -605,7 +605,7 @@ class CardRenderer:
             y += SECTION_GAP
 
         if ench_list:
-            draw.text((PADDING, y), f"✨ 附魔 ({len(enchantments)}种)", font=font_subtitle, fill=COLORS["pink"])
+            draw.text((PADDING, y), f"【附魔】({len(enchantments)}种)", font=font_subtitle, fill=COLORS["pink"])
             y += LINE_HEIGHT_SUBTITLE + SECTION_GAP
             for ench_key, ench_data in ench_list:
                 if isinstance(ench_data, dict):
@@ -621,7 +621,7 @@ class CardRenderer:
                 y += SECTION_GAP * 2
 
         if quests:
-            draw.text((PADDING, y), f"📜 任务 ({len(quests)}个)", font=font_subtitle, fill=COLORS["green"])
+            draw.text((PADDING, y), f"【任务】({len(quests)}个)", font=font_subtitle, fill=COLORS["green"])
             y += LINE_HEIGHT_SUBTITLE + SECTION_GAP
             for qi, q in enumerate(quests, 1):
                 target = q.get("cn_target") or q.get("en_target", "")
@@ -631,7 +631,7 @@ class CardRenderer:
                         draw.text((PADDING + INDENT, y), wl, font=font_small, fill=COLORS["text_dim"])
                         y += LINE_HEIGHT_SMALL
                 if reward:
-                    for wl in self._wrap_text(f"✨ {reward}", font_small, content_width - INDENT_DEEP):
+                    for wl in self._wrap_text(f"=> {reward}", font_small, content_width - INDENT_DEEP):
                         draw.text((PADDING + INDENT, y), wl, font=font_small, fill=COLORS["accent"])
                         y += LINE_HEIGHT_SMALL
                 y += SKILL_DESC_GAP
@@ -727,7 +727,7 @@ class CardRenderer:
             y += SECTION_GAP
 
         if descriptions and len(descriptions) > 1:
-            draw.text((PADDING, y), "📋 各品质描述", font=font_subtitle, fill=COLORS["purple"])
+            draw.text((PADDING, y), "【各品质描述】", font=font_subtitle, fill=COLORS["purple"])
             y += LINE_HEIGHT_SUBTITLE + SECTION_GAP
             for desc in descriptions[:4]:
                 cn = desc.get("cn", "")
@@ -776,7 +776,7 @@ class CardRenderer:
         y = PADDING
         self._draw_rounded_rect(draw, (0, 0, BUILD_CARD_WIDTH, header_h + PADDING), HEADER_RADIUS, COLORS["header_bg"])
 
-        title_text = f"🏗️ 「{query}」推荐阵容"
+        title_text = f"「{query}」推荐阵容"
         draw.text((PADDING, y + 6 * SCALE), title_text, font=font_title, fill=COLORS["text"])
         sub = f"来源: bazaar-builds.net | 共{len(builds)}条结果"
         if search_term != query:
@@ -801,7 +801,7 @@ class CardRenderer:
                 y += LINE_HEIGHT_SUBTITLE
 
             y += DESC_GAP
-            draw.text((PADDING + INDENT, y), f"📅 {build['date']}", font=font_small, fill=COLORS["text_dim"])
+            draw.text((PADDING + INDENT, y), f"{build['date']}", font=font_small, fill=COLORS["text_dim"])
             y += LINE_HEIGHT_LINK
 
             if build.get("excerpt"):
@@ -811,7 +811,7 @@ class CardRenderer:
                     y += LINE_HEIGHT_EXCERPT
                 y += SKILL_DESC_GAP
 
-            draw.text((PADDING + INDENT, y), f"🔗 {build['link']}", font=font_link, fill=COLORS["accent"])
+            draw.text((PADDING + INDENT, y), f"{build['link']}", font=font_link, fill=COLORS["accent"])
             y += LINE_HEIGHT_SMALL
 
             if i < len(builds) - 1:
@@ -821,7 +821,7 @@ class CardRenderer:
 
         y += SECTION_GAP
         more_url = f"https://bazaar-builds.net/?s={search_term.replace(' ', '+')}"
-        more_text = f"💡 更多阵容: {more_url}"
+        more_text = f"更多阵容: {more_url}"
         more_lines = self._wrap_text(more_text, font_link, content_width)
         for ml in more_lines:
             draw.text((PADDING, y), ml, font=font_link, fill=COLORS["green"])
