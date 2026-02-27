@@ -39,9 +39,17 @@ class BazaarPlugin(Star):
         self.items = []
         self.skills = []
         self.plugin_dir = Path(os.path.dirname(os.path.abspath(__file__)))
+        self.renderer = None
 
     async def initialize(self):
         self._load_data()
+        try:
+            from .card_renderer import CardRenderer
+            self.renderer = CardRenderer(self.plugin_dir)
+            logger.info("图片卡片渲染器已加载")
+        except Exception as e:
+            logger.warning(f"图片渲染器加载失败，将使用纯文本模式: {e}")
+            self.renderer = None
         logger.info(
             f"Bazaar 插件加载完成: {len(self.monsters)} 个怪物, "
             f"{len(self.items)} 个物品, {len(self.skills)} 个技能"
@@ -409,6 +417,13 @@ class BazaarPlugin(Star):
                 yield event.plain_result(f"未找到怪物「{query}」，请使用 /bzlist 查看所有怪物。")
                 return
 
+        if self.renderer:
+            try:
+                img_bytes = await self.renderer.render_monster_card(found_key, found_monster)
+                yield event.image_result(bytes_data=img_bytes)
+                return
+            except Exception as e:
+                logger.warning(f"怪物卡片渲染失败，回退文本: {e}")
         yield event.plain_result(self._format_monster_info(found_key, found_monster))
 
     @filter.command("bzitem")
@@ -475,6 +490,13 @@ class BazaarPlugin(Star):
             yield event.plain_result(f"未找到物品「{query}」，请使用 /bzsearch 搜索。")
             return
 
+        if self.renderer:
+            try:
+                img_bytes = await self.renderer.render_item_card(found)
+                yield event.image_result(bytes_data=img_bytes)
+                return
+            except Exception as e:
+                logger.warning(f"物品卡片渲染失败，回退文本: {e}")
         yield event.plain_result(self._format_item_info(found))
 
     @filter.command("bzskill")
@@ -515,6 +537,13 @@ class BazaarPlugin(Star):
             yield event.plain_result(f"未找到技能「{query}」，请使用 /bzsearch 搜索。")
             return
 
+        if self.renderer:
+            try:
+                img_bytes = await self.renderer.render_skill_card(found)
+                yield event.image_result(bytes_data=img_bytes)
+                return
+            except Exception as e:
+                logger.warning(f"技能卡片渲染失败，回退文本: {e}")
         yield event.plain_result(self._format_skill_info(found))
 
     @filter.command("bzsearch")

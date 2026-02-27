@@ -40,7 +40,18 @@ async def handle_input(plugin, user_input):
     event = AstrMessageEvent(message_str=args)
 
     async for result in method(event):
-        print(result)
+        if isinstance(result, dict) and result.get("type") == "image":
+            img_bytes = result.get("bytes")
+            if img_bytes:
+                out_path = os.path.join("output", f"card_{cmd[1:]}.png")
+                os.makedirs("output", exist_ok=True)
+                with open(out_path, "wb") as f:
+                    f.write(img_bytes)
+                print(f"🖼️ 图片已保存到 {out_path} ({len(img_bytes)} 字节)")
+            else:
+                print(f"🖼️ [图片结果] url={result.get('url')} path={result.get('path')}")
+        else:
+            print(result)
 
 
 async def main():

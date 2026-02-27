@@ -24,3 +24,7 @@ args = "python app.py"
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[nix]
+channel = "stable-25_05"
+packages = ["freetype", "lcms2", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "openjpeg", "tcl", "tk", "zlib", "wqy_zenhei"]
