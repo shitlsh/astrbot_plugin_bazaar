@@ -376,7 +376,6 @@ class BazaarPlugin(Star):
             "/bzsearch <关键词> - 搜索怪物、物品和技能\n"
             "  示例: /bzsearch 灼烧\n"
             "  示例: /bzsearch poison\n\n"
-            "/bzlist - 列出所有怪物\n\n"
             "/bzitems [标签] - 按标签筛选物品\n"
             "  示例: /bzitems Weapon\n\n"
             "/bztier <品质> - 按品质筛选物品\n"
@@ -423,7 +422,7 @@ class BazaarPlugin(Star):
                 )
                 return
             else:
-                yield event.plain_result(f"未找到怪物「{query}」，请使用 /bzlist 查看所有怪物。")
+                yield event.plain_result(f"未找到怪物「{query}」，请使用 /bzsearch 搜索。")
                 return
 
         if self.renderer:
@@ -600,28 +599,6 @@ class BazaarPlugin(Star):
             lines.append("")
 
         lines.append("💡 使用 /bzmonster, /bzitem 或 /bzskill 查看详情")
-        yield event.plain_result("\n".join(lines))
-
-    @filter.command("bzlist")
-    async def cmd_list(self, event: AstrMessageEvent):
-        """列出所有怪物"""
-        if not self.monsters:
-            yield event.plain_result("暂无怪物数据。")
-            return
-
-        lines = [f"🐉 所有怪物列表 (共{len(self.monsters)}个):", "━━━━━━━━━━━━━━━━━━"]
-        for key, monster in self.monsters.items():
-            name_zh = monster.get("name_zh", key)
-            name_en = monster.get("name", "")
-            avail = monster.get("available", "")
-            skill_count = len(monster.get("skills", []))
-            item_count = len(set(
-                it.get("id", it.get("name", "")) for it in monster.get("items", [])
-            ))
-            avail_str = f" [{avail}]" if avail else ""
-            lines.append(f"  • {name_zh}({name_en}){avail_str} - {skill_count}技能/{item_count}物品")
-
-        lines.append(f"\n💡 使用 /bzmonster <名称> 查看详情")
         yield event.plain_result("\n".join(lines))
 
     @filter.command("bzitems")
