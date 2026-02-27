@@ -1,6 +1,35 @@
-name: astrbot_plugin_bazaar
-display_name: Bazaar 数据查询助手
-desc: 基于 BazaarHelper 的 The Bazaar 游戏数据查询插件，支持怪物、物品、技能查询与搜索。
-version: 1.0.0
-author: BazaarHelper
-repo: https://github.com/shitlsh/astrbot_plugin_bazaar
+name: "astrbot_plugin_bazaar"
+display_name: "大巴扎小助手"
+desc: "astrbot_plugin_bazaar 是一个 AstrBot 聊天机器人插件，可以在 QQ / Telegram / 微信等平台中快速查询 The Bazaar 游戏数据，包括怪物、物品、技能信息，以及来自社区的推荐阵容。\n\n查询结果以精美的图片卡片形式呈现，支持中英文双语查询。"
+version: "v1.0.0"
+author: "钱德勒饼"
+repo: "https://github.com/shitlsh/astrbot_plugin_bazaar"
+homepage: "https://github.com/shitlsh/astrbot_plugin_bazaar"
+license: "MIT"
+tags:
+  - "bazaar"
+  - "电子游戏"
+compatibility:
+  min_astrbot_version: "4.0.0"
+platforms:
+  - "aiocqhttp"
+  - "qq"
+  - "qq_official"
+  - "telegram"
+  - "gewechat"
+features:
+  - "怪物/物品/技能数据查询"
+  - "图片卡片渲染展示"
+  - "中英文双语搜索"
+  - "社区推荐阵容查询"
+  - "按标签/品质/英雄筛选"
+keywords:
+  - bazaar
+  - thebazaar
+  - 大巴扎
+  - 游戏助手
+  - game
+  - 怪物
+  - 物品
+  - 技能
+  - 阵容

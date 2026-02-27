@@ -37,7 +37,7 @@ def _get_skill_text(skill_entry) -> str:
     return str(skill_entry)
 
 
-@register("astrbot_plugin_bazaar", "BazaarHelper", "The Bazaar 游戏数据查询插件，支持怪物、物品、技能搜索", "1.0.0")
+@register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、阵容查询，图片卡片展示", "v1.0.0")
 class BazaarPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
