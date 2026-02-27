@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.0.3
+
+### Features
+
+- 别名系统：新增 `/tbzalias` 命令管理别名（list/add/del），配置持久化到 `data/aliases.json`
+  - 支持 7 种分类：hero, item, monster, skill, tag, tier, size
+  - 后台文件和命令行两种方式修改后数据自动保持一致（文件变更自动检测重载）
+- 预置社区常用英雄别名：猪猪/猪/猪哥→Pygmalien、鸡煲/机宝→Dooley、海盗/海盗姐→Vanessa、黑妹→Stelle、厨子/大厨/厨师→Jules、中立/通用→Common
+- `/tbzbuild` 阵容查询支持智能分词和别名：`/tbzbuild 海盗船锚` 自动识别为 `Vanessa Anchor` 搜索
+- 智能分词 CJK 模糊匹配：`/tbzsearch 杜利中型灼烧` 自动分词为英雄+尺寸+标签条件
+- 搜索条件新增尺寸（size/尺寸）前缀支持
+
+### Improvements
+
+- 图片卡片 2x 高清渲染（SCALE=2），输出 1040px 宽卡片，文字更加清晰锐利
+- 卡片中 emoji 字符替换为中文方括号标题（如【主动技能】），修复字体不支持 emoji 导致的方块显示
+- 搜索结果显示"识别条件"，让用户确认系统理解是否正确
+- 品质筛选中英文映射修正（青铜→Bronze、黄金→Gold 等）
+
 ## v1.0.2
 
 ### Features

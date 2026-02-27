@@ -1121,6 +1121,42 @@ class BazaarPlugin(Star):
                 return item.get("name_en", name_cn)
         return name_cn
 
+    def _translate_build_query(self, query: str) -> tuple[str, str]:
+        self._reload_aliases_if_changed()
+        tokens = self._smart_tokenize(query)
+        search_parts = []
+        display_parts = []
+        for token in tokens:
+            tl = token.lower()
+            entry = self._vocab.get(tl)
+            if entry:
+                vtype, vval = entry
+                if vtype == "hero":
+                    search_parts.append(vval)
+                    display_parts.append(f"英雄:{vval}")
+                    continue
+                elif vtype == "tag":
+                    search_parts.append(vval.split("/")[0].strip())
+                    display_parts.append(f"标签:{vval}")
+                    continue
+                elif vtype == "tier":
+                    search_parts.append(vval)
+                    display_parts.append(f"品质:{vval}")
+                    continue
+                elif vtype == "size":
+                    search_parts.append(vval.split("/")[0].strip())
+                    display_parts.append(f"尺寸:{vval}")
+                    continue
+            en = self._translate_item_name(token)
+            search_parts.append(en)
+            if en != token:
+                display_parts.append(f"{token}→{en}")
+            else:
+                display_parts.append(token)
+        search_term = " ".join(search_parts)
+        display = " + ".join(display_parts)
+        return search_term, display
+
     async def _download_image(self, url: str) -> bytes | None:
         try:
             session = await self._get_session()
@@ -1201,19 +1237,15 @@ class BazaarPlugin(Star):
             count = max(1, min(int(parts[1]), 10))
             query = parts[0].strip()
 
-        search_term = query
-        is_cn = any('\u4e00' <= c <= '\u9fff' for c in query)
-        if is_cn:
-            en_name = self._translate_item_name(query)
-            if en_name != query:
-                search_term = en_name
+        search_term, display = self._translate_build_query(query)
 
         builds = await self._fetch_builds(search_term, count)
 
         if not builds:
-            hint = f"（已翻译为: {search_term}）" if search_term != query else ""
+            hint = f"\n📋 识别: {display}" if display != query else ""
             yield event.plain_result(
-                f"未找到与「{query}」{hint}相关的阵容。\n"
+                f"未找到与「{query}」相关的阵容。{hint}\n"
+                f"🔍 搜索词: {search_term}\n"
                 f"请尝试使用英文物品名搜索，或访问:\n"
                 f"https://bazaar-builds.net/?s={search_term.replace(' ', '+')}"
             )
@@ -1222,6 +1254,8 @@ class BazaarPlugin(Star):
         header = f"🏗️ 「{query}」推荐阵容 (共{len(builds)}条)"
         if search_term != query:
             header += f"\n🔍 搜索: {search_term}"
+        if display != query and display != search_term:
+            header += f"\n📋 识别: {display}"
 
         nodes = []
         nodes.append(Comp.Node(
