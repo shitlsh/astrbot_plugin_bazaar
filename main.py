@@ -12,7 +12,7 @@ from astrbot.api import logger, AstrBotConfig
 import astrbot.api.message_components as Comp
 
 BUILDS_API = "https://bazaar-builds.net/wp-json/wp/v2"
-DEFAULT_BUILD_COUNT = 3
+DEFAULT_BUILD_COUNT = 5
 
 BUILD_FILTER_PATTERNS = re.compile(
     r'(?i)\b(?:patch|hotfix|update|changelog|maintenance|downtime|release\s*note|dev\s*blog|news)\b'
@@ -1274,7 +1274,10 @@ class BazaarPlugin(Star):
             return
 
         parts = query.rsplit(maxsplit=1)
-        count = DEFAULT_BUILD_COUNT
+        if self.config:
+            count = max(1, min(int(self.config.get("build_default_count", DEFAULT_BUILD_COUNT)), 10))
+        else:
+            count = DEFAULT_BUILD_COUNT
         if len(parts) == 2 and parts[1].isdigit():
             count = max(1, min(int(parts[1]), 10))
             query = parts[0].strip()
