@@ -135,6 +135,9 @@ class BazaarPlugin(Star):
                         p = p.strip()
                         if p and len(p) >= 2:
                             vocab[p.lower()] = ("tag", p)
+        hero_aliases = {"中立": "Common", "通用": "Common", "common": "Common"}
+        for alias, canonical in hero_aliases.items():
+            vocab[alias] = ("hero", canonical)
         for k, v in TIER_MAP.items():
             if len(k) >= 2:
                 vocab[k] = ("tier", v)
