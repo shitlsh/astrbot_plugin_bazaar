@@ -62,7 +62,7 @@ Bazaar Builds 是一个由社区驱动的 The Bazaar 阵容分享网站，玩家
 
 ```bash
 cd /path/to/astrbot/data/plugins/
-git clone https://github.com/你的用户名/astrbot_plugin_bazaar.git
+git clone https://github.com/shitlsh/astrbot_plugin_bazaar.git
 ```
 
 ### 依赖
