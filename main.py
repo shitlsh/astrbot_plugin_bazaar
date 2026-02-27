@@ -9,6 +9,7 @@ import aiohttp
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
+import astrbot.api.message_components as Comp
 
 BUILDS_API = "https://bazaar-builds.net/wp-json/wp/v2"
 DEFAULT_BUILD_COUNT = 3
@@ -464,7 +465,7 @@ class BazaarPlugin(Star):
         if self.renderer:
             try:
                 img_bytes = await self.renderer.render_monster_card(found_key, found_monster)
-                yield event.image_result(bytes_data=img_bytes)
+                yield event.chain_result([Comp.Image.fromBytes(img_bytes)])
                 return
             except Exception as e:
                 logger.warning(f"怪物卡片渲染失败，回退文本: {e}")
@@ -532,7 +533,7 @@ class BazaarPlugin(Star):
         if self.renderer:
             try:
                 img_bytes = await self.renderer.render_item_card(found)
-                yield event.image_result(bytes_data=img_bytes)
+                yield event.chain_result([Comp.Image.fromBytes(img_bytes)])
                 return
             except Exception as e:
                 logger.warning(f"物品卡片渲染失败，回退文本: {e}")
@@ -570,7 +571,7 @@ class BazaarPlugin(Star):
         if self.renderer:
             try:
                 img_bytes = await self.renderer.render_skill_card(found)
-                yield event.image_result(bytes_data=img_bytes)
+                yield event.chain_result([Comp.Image.fromBytes(img_bytes)])
                 return
             except Exception as e:
                 logger.warning(f"技能卡片渲染失败，回退文本: {e}")
@@ -878,7 +879,7 @@ class BazaarPlugin(Star):
                 try:
                     img_bytes = await self._download_image(build["image_url"])
                     if img_bytes:
-                        yield event.image_result(bytes_data=img_bytes)
+                        yield event.chain_result([Comp.Image.fromBytes(img_bytes)])
                         yield event.plain_result(caption)
                         continue
                 except Exception as e:
