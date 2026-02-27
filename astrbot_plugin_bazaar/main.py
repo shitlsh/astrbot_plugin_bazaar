@@ -769,6 +769,16 @@ class BazaarPlugin(Star):
                 return item.get("name_en", name_cn)
         return name_cn
 
+    async def _download_image(self, url: str) -> bytes | None:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, timeout=aiohttp.ClientTimeout(total=20)) as resp:
+                    if resp.status == 200:
+                        return await resp.read()
+        except Exception as e:
+            logger.debug(f"图片下载失败: {url}: {e}")
+        return None
+
     async def _fetch_builds(self, search_term: str, count: int) -> list:
         url = f"{BUILDS_API}/posts"
         params = {
@@ -791,19 +801,21 @@ class BazaarPlugin(Star):
                         excerpt_html.replace("<p>", "").replace("</p>", "").replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
                     ).strip()
 
-                    thumb_url = ""
+                    image_url = ""
                     media_id = post.get("featured_media", 0)
                     if media_id:
-                        media_url = f"{BUILDS_API}/media/{media_id}?_fields=media_details"
+                        media_url = f"{BUILDS_API}/media/{media_id}?_fields=source_url,media_details"
                         try:
                             async with session.get(media_url, timeout=aiohttp.ClientTimeout(total=10)) as mresp:
                                 if mresp.status == 200:
                                     media = await mresp.json()
                                     sizes = media.get("media_details", {}).get("sizes", {})
-                                    if "medium" in sizes:
-                                        thumb_url = sizes["medium"]["source_url"]
-                                    elif "large" in sizes:
-                                        thumb_url = sizes["large"]["source_url"]
+                                    for size_key in ("large", "medium_large", "1536x1536", "medium"):
+                                        if size_key in sizes:
+                                            image_url = sizes[size_key]["source_url"]
+                                            break
+                                    if not image_url:
+                                        image_url = media.get("source_url", "")
                         except Exception:
                             pass
 
@@ -812,7 +824,7 @@ class BazaarPlugin(Star):
                         "link": post.get("link", ""),
                         "date": post.get("date", "")[:10],
                         "excerpt": excerpt_text[:200],
-                        "thumb_url": thumb_url,
+                        "image_url": image_url,
                     })
                 return builds
         except Exception as e:
@@ -857,29 +869,31 @@ class BazaarPlugin(Star):
             )
             return
 
-        if self.renderer:
-            try:
-                img_bytes = await self.renderer.render_build_card(query, search_term, builds)
-                yield event.image_result(bytes_data=img_bytes)
-                return
-            except Exception as e:
-                logger.warning(f"阵容卡片渲染失败，回退文本: {e}")
-
-        lines = [f"🏗️ 「{query}」相关阵容 (来自 bazaar-builds.net):"]
+        header = f"🏗️ 「{query}」推荐阵容 (共{len(builds)}条)"
         if search_term != query:
-            lines.append(f"🔍 搜索词: {search_term}")
-        lines.append("")
+            header += f"\n🔍 搜索: {search_term}"
+        yield event.plain_result(header)
 
         for i, build in enumerate(builds, 1):
-            lines.append(f"━━ {i}. {build['title']} ━━")
-            lines.append(f"📅 {build['date']}")
-            if build['excerpt']:
-                lines.append(f"💬 {build['excerpt']}")
-            lines.append(f"🔗 {build['link']}")
-            lines.append("")
+            caption = f"━━ {i}. {build['title']} ━━\n📅 {build['date']}\n🔗 {build['link']}"
 
-        lines.append(f"💡 更多阵容: https://bazaar-builds.net/?s={search_term.replace(' ', '+')}")
-        yield event.plain_result("\n".join(lines))
+            if build.get("image_url"):
+                try:
+                    img_bytes = await self._download_image(build["image_url"])
+                    if img_bytes:
+                        yield event.image_result(bytes_data=img_bytes)
+                        yield event.plain_result(caption)
+                        continue
+                except Exception as e:
+                    logger.debug(f"阵容图片下载失败: {e}")
+
+            if build.get("excerpt"):
+                caption += f"\n💬 {build['excerpt']}"
+            yield event.plain_result(caption)
+
+        yield event.plain_result(
+            f"💡 更多阵容: https://bazaar-builds.net/?s={search_term.replace(' ', '+')}"
+        )
 
     async def terminate(self):
         logger.info("Bazaar 插件已卸载")
