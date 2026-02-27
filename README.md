@@ -124,7 +124,8 @@ sudo yum install wqy-zenhei-fonts
 
 - 输入中文物品名会自动翻译为英文进行搜索
 - 支持别名和智能分词：`/tbzbuild 海盗船锚` 自动识别为 `Vanessa Anchor`
-- 默认展示前 3 条结果，可在末尾指定数量（1-10）
+- 自动过滤非阵容内容（Patch Notes、游戏更新等推广信息）
+- 默认展示前 5 条结果（可在管理面板配置），末尾指定数量可覆盖（1-10）
 - 每条结果包含阵容截图和原文链接
 - 示例：`/tbzbuild Runic Daggers` 或 `/tbzbuild 符文匕首 5`
 
@@ -160,6 +161,7 @@ sudo yum install wqy-zenhei-fonts
 | `tag_aliases` | 标签别名 | dict |
 | `tier_aliases` | 品质别名 | dict |
 | `size_aliases` | 尺寸别名 | dict |
+| `build_default_count` | 阵容查询默认返回数量（1-10） | int |
 
 ## 项目结构
 

@@ -15,6 +15,8 @@
 
 ### Improvements
 
+- `/tbzbuild` 阵容查询自动过滤非阵容内容（Patch Notes、Hotfix、Update 等推广信息）
+- `/tbzbuild` 默认返回数量改为 5 条，可通过 AstrBot 管理面板配置（`build_default_count`）
 - 图片卡片 2x 高清渲染（SCALE=2），输出 1040px 宽卡片，文字更加清晰锐利
 - 卡片中 emoji 字符替换为中文方括号标题（如【主动技能】），修复字体不支持 emoji 导致的方块显示
 - 搜索结果显示"识别条件"，让用户确认系统理解是否正确
