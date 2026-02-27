@@ -292,13 +292,11 @@ class BazaarPlugin(Star):
         enchantments = item.get("enchantments", {})
         if enchantments and isinstance(enchantments, dict):
             lines.append(f"✨ 附魔 ({len(enchantments)}种):")
-            for ench_key, ench_data in list(enchantments.items())[:6]:
+            for ench_key, ench_data in enchantments.items():
                 if isinstance(ench_data, dict):
                     ench_cn = ench_data.get("name_cn", ench_key)
                     effect = ench_data.get("effect_cn", ench_data.get("effect_en", ""))
                     lines.append(f"  • {ench_cn}({ench_key}): {effect}")
-            if len(enchantments) > 6:
-                lines.append(f"  ... 还有{len(enchantments) - 6}种附魔")
 
         return "\n".join(lines)
 

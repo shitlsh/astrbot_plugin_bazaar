@@ -493,15 +493,13 @@ class CardRenderer:
         enchantments = item.get("enchantments", {})
         ench_list = []
         if enchantments and isinstance(enchantments, dict):
-            ench_list = list(enchantments.items())[:6]
+            ench_list = list(enchantments.items())
             ench_h = LINE_HEIGHT_SUBTITLE + SECTION_GAP
             for ench_key, ench_data in ench_list:
                 if isinstance(ench_data, dict):
                     effect = ench_data.get("effect_cn", ench_data.get("effect_en", ""))
                     wrapped = self._wrap_text(effect, font_small, content_width - INDENT_DEEP)
                     ench_h += PADDING + len(wrapped) * LINE_HEIGHT_SMALL
-            if len(enchantments) > 6:
-                ench_h += PADDING
             sections_height += ench_h + SECTION_GAP
 
         total_height = sections_height + PADDING * 2 + PADDING
@@ -586,11 +584,6 @@ class CardRenderer:
                     for wl in self._wrap_text(effect, font_small, content_width - INDENT_DEEP):
                         draw.text((PADDING + INDENT_DEEP + 2, y), wl, font=font_small, fill=COLORS["text_dim"])
                         y += LINE_HEIGHT_SMALL
-            if len(enchantments) > 6:
-                draw.text(
-                    (PADDING + INDENT, y), f"... 还有{len(enchantments) - 6}种附魔",
-                    font=font_small, fill=COLORS["text_dim"]
-                )
 
         buf = io.BytesIO()
         img.save(buf, format="PNG")
