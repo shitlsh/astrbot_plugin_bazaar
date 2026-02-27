@@ -700,13 +700,8 @@ class BazaarPlugin(Star):
     def _format_event_info(self, event_data: dict) -> str:
         name = event_data.get("name", "")
         name_en = event_data.get("name_en", "")
-        url = event_data.get("url", "")
 
         lines = [f"🎲 【{name}】({name_en})", ""]
-
-        if url:
-            lines.append(f"🔗 {url}")
-            lines.append("")
 
         choices = event_data.get("choices", [])
         if choices:
