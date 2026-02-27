@@ -37,9 +37,19 @@
 - `/tbzitem <名称>` - 查询物品信息（输出图片卡片，含任务信息）
 - `/tbzskill <名称>` - 查询技能信息（输出图片卡片）
 - `/tbzsearch <条件>` - 多条件搜索（支持 tag:/tier:/hero:/size: 前缀组合，合并转发输出）
-- `/tbzbuild <物品名> [数量]` - 查询推荐阵容（默认3条，最多10条，合并转发输出）
+- `/tbzbuild <物品名> [数量]` - 查询推荐阵容（默认5条，最多10条，合并转发输出）
 - `/tbzalias` - 别名管理（list/add/del）
 - `/tbzupdate` - 从 BazaarHelper 仓库更新游戏数据
+
+## AI 工具 (@llm_tool)
+- 5 个 `@filter.llm_tool` 注册到 AstrBot LLM 工具链，AI 对话中自动调用：
+  - `bazaar_query_item` — 查询物品详情（参数: item_name）
+  - `bazaar_query_monster` — 查询怪物详情（参数: monster_name）
+  - `bazaar_query_skill` — 查询技能详情（参数: skill_name）
+  - `bazaar_search` — 多条件搜索（参数: query）
+  - `bazaar_query_build` — 查询推荐阵容（参数: query, count）
+- 工具返回纯文本格式（非图片），供 AI 整合到回复中
+- 复用现有的 `_resolve_alias()`, `_search_*()`, `_filter_*()`, `_translate_build_query()` 等方法
 
 ## 别名与配置系统
 - 使用 AstrBot 的 `_conf_schema.json` 配置体系，别名可通过 AstrBot 管理面板直接编辑

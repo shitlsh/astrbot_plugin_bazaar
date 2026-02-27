@@ -54,6 +54,7 @@ Bazaar Builds 是一个由社区驱动的 The Bazaar 阵容分享网站，玩家
 - 通过物品名查询社区推荐阵容（展示阵容截图）
 - 别名系统：支持社区昵称映射，可通过 AstrBot 管理面板或命令管理
 - 在线数据更新：一键从 BazaarHelper 仓库拉取最新数据
+- AI 工具集成：AI 在聊天中自动调用物品查询、搜索、阵容推荐等功能
 - 支持中英文双语查询
 - 图片渲染失败时自动回退为纯文本
 
@@ -146,6 +147,20 @@ sudo yum install wqy-zenhei-fonts
 
 预置别名：猪猪→Pygmalien、鸡煲→Dooley、海盗→Vanessa、黑妹→Stelle、厨子→Jules、中立→Common 等。
 
+## AI 工具集成
+
+插件注册了 5 个 AI 工具（`@llm_tool`），当 AstrBot 配置了 LLM 后，AI 可以在对话中自动调用这些功能，无需用户手动输入指令：
+
+| 工具名 | 功能 | 触发场景示例 |
+|--------|------|-------------|
+| `bazaar_query_item` | 查询物品详情 | "放大镜是什么效果？" |
+| `bazaar_query_monster` | 查询怪物详情 | "火灵有什么技能？" |
+| `bazaar_query_skill` | 查询技能详情 | "热情如火这个技能怎么样？" |
+| `bazaar_search` | 多条件搜索 | "有哪些黄金武器？" |
+| `bazaar_query_build` | 查询推荐阵容 | "海盗船锚怎么搭配？" |
+
+AI 会根据用户的自然语言自动选择合适的工具调用，并将结果整合到回复中。
+
 ## 插件配置
 
 本插件使用 AstrBot 的 `_conf_schema.json` 配置系统，别名可通过 AstrBot 管理面板直接编辑，无需手动修改文件。
@@ -154,13 +169,13 @@ sudo yum install wqy-zenhei-fonts
 
 | 配置名 | 说明 | 类型 |
 |--------|------|------|
-| `hero_aliases` | 英雄别名 | dict |
-| `item_aliases` | 物品别名 | dict |
-| `monster_aliases` | 怪物别名 | dict |
-| `skill_aliases` | 技能别名 | dict |
-| `tag_aliases` | 标签别名 | dict |
-| `tier_aliases` | 品质别名 | dict |
-| `size_aliases` | 尺寸别名 | dict |
+| `hero_aliases` | 英雄别名 | text (JSON) |
+| `item_aliases` | 物品别名 | text (JSON) |
+| `monster_aliases` | 怪物别名 | text (JSON) |
+| `skill_aliases` | 技能别名 | text (JSON) |
+| `tag_aliases` | 标签别名 | text (JSON) |
+| `tier_aliases` | 品质别名 | text (JSON) |
+| `size_aliases` | 尺寸别名 | text (JSON) |
 | `build_default_count` | 阵容查询默认返回数量（1-10） | int |
 
 ## 项目结构

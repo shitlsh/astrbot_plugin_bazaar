@@ -96,7 +96,7 @@ CONFIG_KEY_MAP = {
 }
 
 
-@register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、阵容查询，图片卡片展示", "v1.0.3")
+@register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、阵容查询，图片卡片展示，AI 自动调用", "v1.0.4")
 class BazaarPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
@@ -1362,6 +1362,185 @@ class BazaarPlugin(Star):
                         yield event.plain_result(item.text)
                     else:
                         yield event.chain_result([item])
+
+    @filter.llm_tool(name="bazaar_query_item")
+    async def tool_query_item(self, event: AstrMessageEvent, item_name: str):
+        '''查询 The Bazaar 游戏中的物品详细信息，包括技能、属性、数值、附魔和任务。当用户询问某个物品的效果、属性或详情时使用此工具。
+
+        Args:
+            item_name(string): 物品名称，支持中文或英文。例如：放大镜、Magnifying Glass、符文匕首
+        '''
+        query = self._resolve_alias(item_name)
+        kw = query.lower()
+        found = None
+
+        for item in self.items:
+            if (item.get("name_cn", "").lower() == kw or
+                item.get("name_en", "").lower() == kw):
+                found = item
+                break
+
+        if not found:
+            results = self._search_items(query)
+            def item_name_fn(r):
+                return f"{r.get('name_cn', '')}({r.get('name_en', '')})"
+            found, msg = _resolve_search(results, query, item_name_fn, None)
+            if msg:
+                yield event.plain_result(msg)
+                return
+
+        if not found:
+            yield event.plain_result(f"未找到物品「{item_name}」。")
+            return
+
+        yield event.plain_result(self._format_item_info(found))
+
+    @filter.llm_tool(name="bazaar_query_monster")
+    async def tool_query_monster(self, event: AstrMessageEvent, monster_name: str):
+        '''查询 The Bazaar 游戏中的怪物详细信息，包括技能、物品、血量和奖励。当用户询问某个怪物的信息时使用此工具。
+
+        Args:
+            monster_name(string): 怪物名称，支持中文或英文。例如：火灵、Tree Treant
+        '''
+        query = self._resolve_alias(monster_name)
+        kw = query.lower()
+        found_key = None
+        found_monster = None
+
+        for key, monster in self.monsters.items():
+            if (key == query or
+                monster.get("name", "").lower() == kw or
+                monster.get("name_zh", "").lower() == kw):
+                found_key = key
+                found_monster = monster
+                break
+
+        if not found_monster:
+            results = self._search_monsters(query)
+            def monster_name_fn(r):
+                k, m = r
+                return f"{m.get('name_zh', k)}({m.get('name', '')})"
+            found, msg = _resolve_search(results, query, monster_name_fn,
+                f"未找到怪物「{monster_name}」。")
+            if msg:
+                yield event.plain_result(msg)
+                return
+            found_key, found_monster = found
+
+        yield event.plain_result(self._format_monster_info(found_key, found_monster))
+
+    @filter.llm_tool(name="bazaar_query_skill")
+    async def tool_query_skill(self, event: AstrMessageEvent, skill_name: str):
+        '''查询 The Bazaar 游戏中的技能详细信息，包括描述和适用英雄。当用户询问某个技能的效果或信息时使用此工具。
+
+        Args:
+            skill_name(string): 技能名称，支持中文或英文。例如：热情如火、Burning Passion
+        '''
+        query = self._resolve_alias(skill_name)
+        kw = query.lower()
+        found = None
+
+        for skill in self.skills:
+            if (skill.get("name_cn", "").lower() == kw or
+                skill.get("name_en", "").lower() == kw):
+                found = skill
+                break
+
+        if not found:
+            results = self._search_skills(query)
+            def skill_name_fn(r):
+                return f"{r.get('name_cn', '')}({r.get('name_en', '')})"
+            found, msg = _resolve_search(results, query, skill_name_fn,
+                f"未找到技能「{skill_name}」。")
+            if msg:
+                yield event.plain_result(msg)
+                return
+
+        yield event.plain_result(self._format_skill_info(found))
+
+    @filter.llm_tool(name="bazaar_search")
+    async def tool_search(self, event: AstrMessageEvent, query: str):
+        '''搜索 The Bazaar 游戏中的物品、怪物和技能。支持按关键词、英雄、标签、品质等多条件搜索。当用户想要查找某类物品或按条件筛选时使用此工具。
+
+        Args:
+            query(string): 搜索条件。可以是关键词、英雄名、标签名等。例如：灼烧、Mak的武器、黄金护盾。支持前缀语法如 tag:Weapon hero:Mak tier:Gold
+        '''
+        self._reload_aliases_if_changed()
+        conditions = self._parse_search_conditions(query)
+        has_filters = conditions["tags"] or conditions["tiers"] or conditions["heroes"] or conditions.get("sizes")
+
+        item_results = self._filter_items(conditions)
+        skill_results = self._filter_skills(conditions) if not conditions["tiers"] and not conditions["tags"] and not conditions.get("sizes") else []
+        monster_results = self._search_monsters(conditions["keyword"]) if conditions["keyword"] and not has_filters else []
+
+        if not monster_results and not item_results and not skill_results:
+            yield event.plain_result(f"未找到与「{query}」相关的结果。")
+            return
+
+        lines = []
+        total = len(monster_results) + len(item_results) + len(skill_results)
+        lines.append(f"搜索「{query}」的结果 (共{total}条):")
+
+        if monster_results:
+            lines.append(f"\n怪物 ({len(monster_results)}个):")
+            for key, m in monster_results[:10]:
+                lines.append(f"  - {m.get('name_zh', key)}({m.get('name', '')})")
+            if len(monster_results) > 10:
+                lines.append(f"  ... 还有{len(monster_results) - 10}个")
+
+        if item_results:
+            lines.append(f"\n物品 ({len(item_results)}个):")
+            for it in item_results[:15]:
+                tier = _clean_tier(it.get("starting_tier", ""))
+                hero = it.get("heroes", "").split("/")[0].strip()
+                lines.append(f"  - {it.get('name_cn', '')}({it.get('name_en', '')}) [{tier}] - {hero}")
+            if len(item_results) > 15:
+                lines.append(f"  ... 还有{len(item_results) - 15}个")
+
+        if skill_results:
+            lines.append(f"\n技能 ({len(skill_results)}个):")
+            for sk in skill_results[:10]:
+                lines.append(f"  - {sk.get('name_cn', '')}({sk.get('name_en', '')})")
+            if len(skill_results) > 10:
+                lines.append(f"  ... 还有{len(skill_results) - 10}个")
+
+        yield event.plain_result("\n".join(lines))
+
+    @filter.llm_tool(name="bazaar_query_build")
+    async def tool_query_build(self, event: AstrMessageEvent, query: str, count: int = 5):
+        '''查询 The Bazaar 游戏的社区推荐阵容。根据物品名、英雄名等关键词从 bazaar-builds.net 搜索玩家分享的通关阵容。当用户询问某个物品的阵容搭配、某个英雄怎么玩、推荐阵容时使用此工具。
+
+        Args:
+            query(string): 搜索关键词，可以是物品名、英雄名或组合。支持中文，会自动翻译为英文搜索。例如：符文匕首、海盗船锚、Vanessa Anchor
+            count(int): 返回结果数量，默认5，范围1-10
+        '''
+        count = max(1, min(count, 10))
+        search_term, display = self._translate_build_query(query)
+        builds = await self._fetch_builds(search_term, count)
+
+        if not builds:
+            yield event.plain_result(
+                f"未找到与「{query}」相关的阵容。\n搜索词: {search_term}\n"
+                f"可访问: https://bazaar-builds.net/?s={search_term.replace(' ', '+')}"
+            )
+            return
+
+        lines = [f"「{query}」推荐阵容 (共{len(builds)}条):"]
+        if search_term != query:
+            lines.append(f"搜索词: {search_term}")
+        lines.append("")
+        for i, build in enumerate(builds, 1):
+            lines.append(f"{i}. {build['title']}")
+            lines.append(f"   日期: {build['date']}")
+            lines.append(f"   链接: {build['link']}")
+            if build.get("excerpt"):
+                lines.append(f"   简介: {build['excerpt'][:100]}")
+            lines.append("")
+
+        more_url = f"https://bazaar-builds.net/?s={search_term.replace(' ', '+')}"
+        lines.append(f"更多阵容: {more_url}")
+
+        yield event.plain_result("\n".join(lines))
 
     async def terminate(self):
         if self._session and not self._session.closed:
