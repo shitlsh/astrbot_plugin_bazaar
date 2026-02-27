@@ -8,7 +8,7 @@
 - 958 个物品 (items_db.json)
 - 448 个技能 (skills_db.json)
 
-数据来源于 BazaarHelper 项目 `src-tauri/resources/` 目录的本地 JSON 数据库文件。
+数据来源于 BazaarHelper 项目 `src-tauri/resources/` 目录的本地 JSON 数据库文件。支持通过 `/tbzupdate` 在线更新。
 
 ## 项目结构
 ```
@@ -29,20 +29,28 @@
 ## 支持的指令
 - `/tbzhelp` - 查看帮助
 - `/tbzmonster <名称>` - 查询怪物信息（输出图片卡片）
-- `/tbzitem <名称>` - 查询物品信息（输出图片卡片）
+- `/tbzitem <名称>` - 查询物品信息（输出图片卡片，含任务信息）
 - `/tbzskill <名称>` - 查询技能信息（输出图片卡片）
-- `/tbzsearch <关键词>` - 搜索怪物、物品和技能
-- `/tbzitems [标签]` - 按标签筛选物品
-- `/tbztier <品质>` - 按品质筛选物品
-- `/tbzhero <英雄名>` - 查看英雄专属内容
-- `/tbzbuild <物品名> [数量]` - 查询推荐阵容（默认3条，最多10条）
+- `/tbzsearch <条件>` - 多条件搜索（支持 tag:/tier:/hero: 前缀组合，合并转发输出）
+- `/tbzbuild <物品名> [数量]` - 查询推荐阵容（默认3条，最多10条，合并转发输出）
+- `/tbzupdate` - 从 BazaarHelper 仓库更新游戏数据
 
 ## 图片卡片渲染
 - 使用 Pillow 生成深色主题 PNG 卡片
-- 怪物/物品图片从 BazaarHelper GitHub 仓库拉取并缓存到 `data/cache/`
+- 缩略图 96px，保持原始宽高比（源图来自 BazaarHelper GitHub 仓库，缓存到 `data/cache/`）
 - 品质（Bronze/Silver/Gold/Diamond）使用对应颜色高亮
+- 物品卡片包含：技能、属性、数值(含tier成长)、附魔、任务
 - 渲染失败时自动回退到纯文本输出
 - 需要中文字体支持（WenQuanYi Zen Hei）
+
+## 多条件搜索
+- `/tbzsearch` 支持多种条件前缀：
+  - `tag:标签名` 或 `标签:标签名` - 按标签筛选
+  - `tier:品质` 或 `品质:品质名` - 按品质筛选
+  - `hero:英雄` 或 `英雄:英雄名` - 按英雄筛选
+  - 纯文本 - 关键词搜索名称/标签/描述
+- 条件可自由组合，如 `/tbzsearch tag:Weapon hero:Mak tier:Gold`
+- 搜索结果完整展示（不截断），使用合并转发消息格式
 
 ## 阵容查询
 - `/tbzbuild` 通过 bazaar-builds.net 的 WordPress REST API 搜索阵容
@@ -51,13 +59,18 @@
 - 结果以合并转发消息(Comp.Nodes)打包发送，避免刷屏；不支持的平台自动回退逐条发送
 - API端点: `https://bazaar-builds.net/wp-json/wp/v2/posts?search=...`
 
+## 数据更新
+- `/tbzupdate` 从 BazaarHelper GitHub 仓库下载最新 JSON 数据
+- 下载地址: `https://raw.githubusercontent.com/Duangi/BazaarHelper/main/src-tauri/resources/{items_db,monsters_db,skills_db}.json`
+- 下载后验证 JSON 格式，写入 `data/` 目录并热重载
+
 ## 架构要点
 - 持久化 aiohttp.ClientSession：在 `initialize()` 创建，`terminate()` 关闭，main.py 和 card_renderer.py 共享
 - HTML 清理使用 `re.sub(r'<[^>]+>', '', text)` 正则替换
 - 搜索校验逻辑提取为通用 `_resolve_search()` 辅助函数
 - `_wrap_text()` 对中文逐字换行，英文按词换行，避免截断单词
-- card_renderer.py 中所有布局数值提取为模块级常量（PADDING, LINE_HEIGHT_* 等）
-- `@register` 装饰器保留用于兼容旧版 AstrBot，新版会自动识别 Star 子类
+- card_renderer.py 中所有布局数值提取为模块级常量（PADDING, LINE_HEIGHT_*, THUMB_SIZE 等）
+- 合并转发消息使用 `Comp.Nodes([Comp.Node(...)])` 构建，含异常回退逻辑
 
 ## 技术栈
 - Python 3.11

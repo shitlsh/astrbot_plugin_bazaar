@@ -66,8 +66,8 @@ INDENT = 10
 INDENT_DEEP = 20
 DESC_GAP = 4
 SKILL_DESC_GAP = 6
-THUMB_SIZE = 64
-THUMB_MARGIN = 76
+THUMB_SIZE = 96
+THUMB_MARGIN = 108
 
 FONT_SIZE_TITLE = 28
 FONT_SIZE_TITLE_SMALL = 26
@@ -220,7 +220,7 @@ class CardRenderer:
             f"{GITHUB_RAW}/assets/monsters/characters/{name_zh}.webp"
         )
 
-        header_height = 80 if not monster_img else 100
+        header_height = 80 if not monster_img else 120
         sections.append(("header", header_height))
 
         info_lines = []
@@ -296,14 +296,20 @@ class CardRenderer:
         self._draw_rounded_rect(draw, (0, 0, CARD_WIDTH, header_height + PADDING), HEADER_RADIUS, COLORS["header_bg"])
 
         if monster_img:
-            thumb = monster_img.resize((THUMB_SIZE, THUMB_SIZE), Image.LANCZOS)
-            img.paste(thumb, (PADDING, y + 8), thumb)
+            orig_w, orig_h = monster_img.size
+            ratio = min(THUMB_SIZE / orig_w, THUMB_SIZE / orig_h)
+            new_w = max(1, int(orig_w * ratio))
+            new_h = max(1, int(orig_h * ratio))
+            thumb = monster_img.resize((new_w, new_h), Image.LANCZOS)
+            thumb_y = y + 8 + (THUMB_SIZE - new_h) // 2
+            thumb_x = PADDING + (THUMB_SIZE - new_w) // 2
+            img.paste(thumb, (thumb_x, thumb_y), thumb)
             text_x = PADDING + THUMB_MARGIN
         else:
             text_x = PADDING
 
-        draw.text((text_x, y + 8), name_zh, font=font_title, fill=COLORS["text"])
-        draw.text((text_x, y + 42), name_en, font=font_subtitle, fill=COLORS["text_dim"])
+        draw.text((text_x, y + 12), name_zh, font=font_title, fill=COLORS["text"])
+        draw.text((text_x, y + 46), name_en, font=font_subtitle, fill=COLORS["text_dim"])
 
         tags = monster.get("tags", [])
         if isinstance(tags, list) and tags:
@@ -431,7 +437,7 @@ class CardRenderer:
 
         sections_height = 0
 
-        header_h = 90
+        header_h = 110
         sections_height += header_h
 
         active_skills = item.get("skills", [])
@@ -502,6 +508,24 @@ class CardRenderer:
                     ench_h += PADDING + len(wrapped) * LINE_HEIGHT_SMALL
             sections_height += ench_h + SECTION_GAP
 
+        quests = item.get("quests") or []
+        if quests and not isinstance(quests, list):
+            quests = [quests]
+        quests_h = 0
+        if quests:
+            quests_h = LINE_HEIGHT_SUBTITLE + SECTION_GAP
+            for q in quests:
+                target = q.get("cn_target") or q.get("en_target", "")
+                reward = q.get("cn_reward") or q.get("en_reward", "")
+                if target:
+                    wrapped_t = self._wrap_text(f"→ {target}", font_small, content_width - INDENT_DEEP)
+                    quests_h += len(wrapped_t) * LINE_HEIGHT_SMALL
+                if reward:
+                    wrapped_r = self._wrap_text(f"✨ {reward}", font_small, content_width - INDENT_DEEP)
+                    quests_h += len(wrapped_r) * LINE_HEIGHT_SMALL
+                quests_h += SKILL_DESC_GAP
+            sections_height += quests_h + SECTION_GAP
+
         total_height = sections_height + PADDING * 2 + PADDING
         img = Image.new("RGBA", (CARD_WIDTH, total_height), COLORS["bg"])
         draw = ImageDraw.Draw(img)
@@ -511,14 +535,20 @@ class CardRenderer:
         self._draw_rounded_rect(draw, (0, 0, CARD_WIDTH, header_h + PADDING), HEADER_RADIUS, COLORS["header_bg"])
 
         if item_img:
-            thumb = item_img.resize((THUMB_SIZE, THUMB_SIZE), Image.LANCZOS)
-            img.paste(thumb, (PADDING, y + 8), thumb)
+            orig_w, orig_h = item_img.size
+            ratio = min(THUMB_SIZE / orig_w, THUMB_SIZE / orig_h)
+            new_w = max(1, int(orig_w * ratio))
+            new_h = max(1, int(orig_h * ratio))
+            thumb = item_img.resize((new_w, new_h), Image.LANCZOS)
+            thumb_y = y + 8 + (THUMB_SIZE - new_h) // 2
+            thumb_x = PADDING + (THUMB_SIZE - new_w) // 2
+            img.paste(thumb, (thumb_x, thumb_y), thumb)
             text_x = PADDING + THUMB_MARGIN
         else:
             text_x = PADDING
 
-        draw.text((text_x, y + 8), name_cn, font=font_title, fill=COLORS["text"])
-        draw.text((text_x, y + 38), name_en, font=font_subtitle, fill=COLORS["text_dim"])
+        draw.text((text_x, y + 12), name_cn, font=font_title, fill=COLORS["text"])
+        draw.text((text_x, y + 46), name_en, font=font_subtitle, fill=COLORS["text_dim"])
 
         self._draw_tier_badge(draw, tier_raw, tier_clean, y, CARD_WIDTH, font_tag)
 
@@ -584,6 +614,25 @@ class CardRenderer:
                     for wl in self._wrap_text(effect, font_small, content_width - INDENT_DEEP):
                         draw.text((PADDING + INDENT_DEEP + 2, y), wl, font=font_small, fill=COLORS["text_dim"])
                         y += LINE_HEIGHT_SMALL
+            if quests:
+                self._draw_divider(draw, y + SECTION_GAP, CARD_WIDTH)
+                y += SECTION_GAP * 2
+
+        if quests:
+            draw.text((PADDING, y), f"📜 任务 ({len(quests)}个)", font=font_subtitle, fill=COLORS["green"])
+            y += LINE_HEIGHT_SUBTITLE + SECTION_GAP
+            for qi, q in enumerate(quests, 1):
+                target = q.get("cn_target") or q.get("en_target", "")
+                reward = q.get("cn_reward") or q.get("en_reward", "")
+                if target:
+                    for wl in self._wrap_text(f"→ {target}", font_small, content_width - INDENT_DEEP):
+                        draw.text((PADDING + INDENT, y), wl, font=font_small, fill=COLORS["text_dim"])
+                        y += LINE_HEIGHT_SMALL
+                if reward:
+                    for wl in self._wrap_text(f"✨ {reward}", font_small, content_width - INDENT_DEEP):
+                        draw.text((PADDING + INDENT, y), wl, font=font_small, fill=COLORS["accent"])
+                        y += LINE_HEIGHT_SMALL
+                y += SKILL_DESC_GAP
 
         buf = io.BytesIO()
         img.save(buf, format="PNG")

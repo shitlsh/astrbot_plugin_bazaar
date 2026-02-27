@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.0.2
+
+### Features
+
+- 物品卡片新增「📜 任务」区域，显示任务目标和奖励（参考 BazaarHelper 的 UnifiedItemCard 渲染方式）
+- 新增 `/tbzupdate` 指令：从 BazaarHelper GitHub 仓库下载最新的 items_db、monsters_db、skills_db 数据并热重载
+- 合并搜索指令：将 `/tbzsearch`、`/tbzitems`、`/tbztier`、`/tbzhero` 合并为统一的 `/tbzsearch` 多条件搜索
+  - 支持 `tag:标签`、`tier:品质`、`hero:英雄` 条件前缀，可组合使用
+  - 搜索结果不再截断，完整展示，使用合并转发消息格式发送
+  - 无参数时显示搜索帮助，列出所有可用标签和英雄
+
+### Improvements
+
+- 物品/怪物图片分辨率提升：缩略图从 64x64 增大至 96px，保持原始宽高比，图像更清晰
+- 物品卡片头部布局调整，适配更大的缩略图尺寸
+
+### Removed
+
+- 移除 `/tbzitems`、`/tbztier`、`/tbzhero` 独立指令（功能已合并至 `/tbzsearch`）
+
 ## v1.0.1
 
 ### Breaking Changes

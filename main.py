@@ -64,7 +64,21 @@ def _extract_query(message_str: str, command_name: str) -> str:
     return text
 
 
-@register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、阵容查询，图片卡片展示", "v1.0.1")
+GITHUB_RAW = "https://raw.githubusercontent.com/Duangi/BazaarHelper/main/src-tauri/resources"
+DATA_FILES = {
+    "items_db.json": f"{GITHUB_RAW}/items_db.json",
+    "monsters_db.json": f"{GITHUB_RAW}/monsters_db.json",
+    "skills_db.json": f"{GITHUB_RAW}/skills_db.json",
+}
+
+TIER_MAP = {
+    "bronze": "Bronze", "silver": "Silver", "gold": "Gold", "diamond": "Diamond",
+    "铜": "Bronze", "青铜": "Bronze", "银": "Silver", "白银": "Silver",
+    "金": "Gold", "黄金": "Gold", "钻石": "Diamond", "钻": "Diamond",
+}
+
+
+@register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、阵容查询，图片卡片展示", "v1.0.2")
 class BazaarPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
@@ -297,6 +311,20 @@ class BazaarPlugin(Star):
                     ench_cn = ench_data.get("name_cn", ench_key)
                     effect = ench_data.get("effect_cn", ench_data.get("effect_en", ""))
                     lines.append(f"  • {ench_cn}({ench_key}): {effect}")
+            lines.append("")
+
+        quests = item.get("quests") or []
+        if quests and not isinstance(quests, list):
+            quests = [quests]
+        if quests:
+            lines.append(f"📜 任务 ({len(quests)}个):")
+            for qi, q in enumerate(quests, 1):
+                target = q.get("cn_target") or q.get("en_target", "")
+                reward = q.get("cn_reward") or q.get("en_reward", "")
+                if target:
+                    lines.append(f"  → {target}")
+                if reward:
+                    lines.append(f"  ✨ {reward}")
 
         return "\n".join(lines)
 
@@ -400,26 +428,22 @@ class BazaarPlugin(Star):
             "━━━━━━━━━━━━━━━━━━\n"
             f"📊 数据: {len(self.monsters)}怪物 | {len(self.items)}物品 | {len(self.skills)}技能\n\n"
             "📋 可用指令:\n\n"
-            "/tbzmonster <名称> - 查询怪物信息\n"
-            "  示例: /tbzmonster 火灵\n"
-            "  示例: /tbzmonster pyro\n\n"
-            "/tbzitem <名称> - 查询物品信息\n"
-            "  示例: /tbzitem 地下商街\n"
-            "  示例: /tbzitem Toolbox\n\n"
-            "/tbzskill <名称> - 查询技能信息\n"
+            "/tbzmonster <名称> - 查询怪物详情(图片卡片)\n"
+            "  示例: /tbzmonster 火灵\n\n"
+            "/tbzitem <名称> - 查询物品详情(图片卡片)\n"
+            "  示例: /tbzitem 地下商街\n\n"
+            "/tbzskill <名称> - 查询技能详情(图片卡片)\n"
             "  示例: /tbzskill 热情如火\n\n"
-            "/tbzsearch <关键词> - 搜索怪物、物品和技能\n"
-            "  示例: /tbzsearch 灼烧\n"
-            "  示例: /tbzsearch poison\n\n"
-            "/tbzitems [标签] - 按标签筛选物品\n"
-            "  示例: /tbzitems Weapon\n\n"
-            "/tbztier <品质> - 按品质筛选物品\n"
-            "  示例: /tbztier Gold\n\n"
-            "/tbzhero <英雄名> - 查询英雄专属物品和技能\n"
-            "  示例: /tbzhero 朱尔斯\n\n"
+            "/tbzsearch <条件> - 多条件搜索(支持合并转发)\n"
+            "  关键词搜索: /tbzsearch 灼烧\n"
+            "  按标签筛选: /tbzsearch tag:Weapon\n"
+            "  按品质筛选: /tbzsearch tier:Gold\n"
+            "  按英雄筛选: /tbzsearch hero:Mak\n"
+            "  组合条件: /tbzsearch tag:Weapon hero:Mak tier:Gold\n"
+            "  无参数查看: /tbzsearch (显示可用标签/英雄)\n\n"
             "/tbzbuild <物品名> [数量] - 查询推荐阵容\n"
-            "  示例: /tbzbuild 符文匕首\n"
-            "  示例: /tbzbuild Runic Daggers 5\n\n"
+            "  示例: /tbzbuild 符文匕首\n\n"
+            "/tbzupdate - 从远端更新游戏数据\n\n"
             "/tbzhelp - 显示此帮助信息\n"
             "━━━━━━━━━━━━━━━━━━\n"
             "数据来源: BazaarHelper | bazaar-builds.net"
@@ -575,191 +599,253 @@ class BazaarPlugin(Star):
                 logger.warning(f"技能卡片渲染失败，回退文本: {e}")
         yield event.plain_result(self._format_skill_info(found))
 
+    def _parse_search_conditions(self, query: str) -> dict:
+        conditions = {"keyword": "", "tags": [], "tiers": [], "heroes": []}
+        keywords = []
+        for part in query.split():
+            lower = part.lower()
+            if ":" in part:
+                prefix, value = part.split(":", 1)
+                prefix = prefix.lower()
+                if prefix in ("tag", "标签"):
+                    conditions["tags"].append(value)
+                elif prefix in ("tier", "品质"):
+                    normalized = TIER_MAP.get(value.lower(), value.capitalize())
+                    conditions["tiers"].append(normalized)
+                elif prefix in ("hero", "英雄"):
+                    conditions["heroes"].append(value)
+                else:
+                    keywords.append(part)
+            else:
+                keywords.append(part)
+        conditions["keyword"] = " ".join(keywords)
+        return conditions
+
+    def _filter_items(self, conditions: dict) -> list:
+        results = self.items
+        if conditions["tags"]:
+            filtered = []
+            for item in results:
+                item_tags = (item.get("tags", "") + " " + item.get("hidden_tags", "")).lower()
+                if all(t.lower() in item_tags for t in conditions["tags"]):
+                    filtered.append(item)
+            results = filtered
+        if conditions["tiers"]:
+            filtered = []
+            for item in results:
+                tier = _clean_tier(item.get("starting_tier", ""))
+                if tier in conditions["tiers"]:
+                    filtered.append(item)
+            results = filtered
+        if conditions["heroes"]:
+            filtered = []
+            for item in results:
+                hero_str = item.get("heroes", "").lower()
+                if all(h.lower() in hero_str for h in conditions["heroes"]):
+                    filtered.append(item)
+            results = filtered
+        if conditions["keyword"]:
+            kw = conditions["keyword"].lower()
+            filtered = []
+            for item in results:
+                if (kw in item.get("name_cn", "").lower() or
+                    kw in item.get("name_en", "").lower() or
+                    kw in item.get("tags", "").lower() or
+                    kw in item.get("hidden_tags", "").lower() or
+                    kw in item.get("heroes", "").lower()):
+                    filtered.append(item)
+            results = filtered
+        return results
+
+    def _filter_skills(self, conditions: dict) -> list:
+        results = self.skills
+        if conditions["heroes"]:
+            filtered = []
+            for skill in results:
+                hero_str = skill.get("heroes", "").lower()
+                if all(h.lower() in hero_str for h in conditions["heroes"]):
+                    filtered.append(skill)
+            results = filtered
+        if conditions["keyword"]:
+            kw = conditions["keyword"].lower()
+            filtered = []
+            for skill in results:
+                if (kw in skill.get("name_cn", "").lower() or
+                    kw in skill.get("name_en", "").lower() or
+                    kw in skill.get("description_cn", "").lower() or
+                    kw in skill.get("description_en", "").lower() or
+                    kw in skill.get("heroes", "").lower()):
+                    filtered.append(skill)
+            results = filtered
+        return results
+
+    def _get_search_help(self) -> str:
+        all_tags = set()
+        for item in self.items:
+            for t in item.get("tags", "").split("|"):
+                for p in t.strip().split("/"):
+                    p = p.strip()
+                    if p:
+                        all_tags.add(p)
+        heroes = set()
+        for item in self.items:
+            hero_str = item.get("heroes", "")
+            if hero_str:
+                for p in hero_str.split("/"):
+                    p = p.strip()
+                    if p:
+                        heroes.add(p)
+        sorted_tags = sorted(all_tags)
+        sorted_heroes = sorted(heroes)
+        return (
+            "🔍 多条件搜索帮助\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "用法: /tbzsearch [条件...]\n\n"
+            "支持的条件:\n"
+            "  关键词 - 直接输入文字搜索名称/标签/描述\n"
+            "  tag:标签名 - 按标签筛选 (或 标签:标签名)\n"
+            "  tier:品质 - 按品质筛选 (或 品质:品质名)\n"
+            "  hero:英雄 - 按英雄筛选 (或 英雄:英雄名)\n\n"
+            "示例:\n"
+            "  /tbzsearch 灼烧\n"
+            "  /tbzsearch tag:Weapon hero:Mak\n"
+            "  /tbzsearch tier:Gold tag:Weapon\n\n"
+            f"🏷️ 可用标签 ({len(sorted_tags)}个):\n"
+            f"  {', '.join(sorted_tags)}\n\n"
+            f"🦸 可用英雄 ({len(sorted_heroes)}个):\n"
+            f"  {', '.join(sorted_heroes)}\n\n"
+            "📊 品质: Bronze(青铜), Silver(白银), Gold(黄金), Diamond(钻石)"
+        )
+
     @filter.command("tbzsearch")
     async def cmd_search(self, event: AstrMessageEvent):
-        """搜索怪物、物品和技能"""
+        """多条件搜索怪物、物品和技能"""
         query = _extract_query(event.message_str, "tbzsearch")
         if not query:
-            yield event.plain_result("请输入搜索关键词，例如: /tbzsearch 灼烧")
+            yield event.plain_result(self._get_search_help())
             return
 
-        monster_results = self._search_monsters(query)
-        item_results = self._search_items(query)
-        skill_results = self._search_skills(query)
+        conditions = self._parse_search_conditions(query)
+        has_filters = conditions["tags"] or conditions["tiers"] or conditions["heroes"]
+
+        item_results = self._filter_items(conditions)
+        skill_results = self._filter_skills(conditions) if not conditions["tiers"] and not conditions["tags"] else []
+        monster_results = self._search_monsters(conditions["keyword"]) if conditions["keyword"] and not has_filters else []
 
         if not monster_results and not item_results and not skill_results:
-            yield event.plain_result(f"未找到与「{query}」相关的结果。")
+            yield event.plain_result(f"未找到与「{query}」相关的结果。\n使用 /tbzsearch 查看搜索帮助。")
             return
 
-        lines = [f"🔍 搜索「{query}」的结果:", ""]
+        condition_desc = query
+        total = len(monster_results) + len(item_results) + len(skill_results)
+
+        nodes = []
+        header = f"🔍 搜索「{condition_desc}」的结果 (共{total}条)"
+        nodes.append(Comp.Node(
+            name="大巴扎小助手", uin="0",
+            content=[Comp.Plain(header)]
+        ))
 
         if monster_results:
-            lines.append(f"🐉 怪物 ({len(monster_results)}个):")
-            for key, m in monster_results[:5]:
+            lines = [f"🐉 怪物 ({len(monster_results)}个):"]
+            for key, m in monster_results:
                 lines.append(f"  • {m.get('name_zh', key)}({m.get('name', '')})")
-            if len(monster_results) > 5:
-                lines.append(f"  ... 还有{len(monster_results) - 5}个结果")
-            lines.append("")
+            nodes.append(Comp.Node(
+                name="大巴扎小助手", uin="0",
+                content=[Comp.Plain("\n".join(lines))]
+            ))
 
         if item_results:
-            lines.append(f"📦 物品 ({len(item_results)}个):")
-            for it in item_results[:8]:
-                tier = _clean_tier(it.get("starting_tier", ""))
-                tier_emoji = TIER_EMOJI.get(tier, "")
-                lines.append(f"  • {tier_emoji} {it.get('name_cn', '')}({it.get('name_en', '')})")
-            if len(item_results) > 8:
-                lines.append(f"  ... 还有{len(item_results) - 8}个结果")
-            lines.append("")
+            page_size = 30
+            for page_start in range(0, len(item_results), page_size):
+                page = item_results[page_start:page_start + page_size]
+                page_num = page_start // page_size + 1
+                total_pages = (len(item_results) + page_size - 1) // page_size
+                if total_pages > 1:
+                    lines = [f"📦 物品 (第{page_num}/{total_pages}页, 共{len(item_results)}个):"]
+                else:
+                    lines = [f"📦 物品 ({len(item_results)}个):"]
+                for it in page:
+                    tier = _clean_tier(it.get("starting_tier", ""))
+                    tier_emoji = TIER_EMOJI.get(tier, "")
+                    hero = it.get("heroes", "").split("/")[0].strip()
+                    lines.append(f"  {tier_emoji} {it.get('name_cn', '')}({it.get('name_en', '')}) - {hero}")
+                nodes.append(Comp.Node(
+                    name="大巴扎小助手", uin="0",
+                    content=[Comp.Plain("\n".join(lines))]
+                ))
 
         if skill_results:
-            lines.append(f"🎯 技能 ({len(skill_results)}个):")
-            for sk in skill_results[:8]:
-                lines.append(f"  • {sk.get('name_cn', '')}({sk.get('name_en', '')})")
-            if len(skill_results) > 8:
-                lines.append(f"  ... 还有{len(skill_results) - 8}个结果")
-            lines.append("")
+            page_size = 30
+            for page_start in range(0, len(skill_results), page_size):
+                page = skill_results[page_start:page_start + page_size]
+                page_num = page_start // page_size + 1
+                total_pages = (len(skill_results) + page_size - 1) // page_size
+                if total_pages > 1:
+                    lines = [f"🎯 技能 (第{page_num}/{total_pages}页, 共{len(skill_results)}个):"]
+                else:
+                    lines = [f"🎯 技能 ({len(skill_results)}个):"]
+                for sk in page:
+                    lines.append(f"  • {sk.get('name_cn', '')}({sk.get('name_en', '')})")
+                nodes.append(Comp.Node(
+                    name="大巴扎小助手", uin="0",
+                    content=[Comp.Plain("\n".join(lines))]
+                ))
 
-        lines.append("💡 使用 /tbzmonster, /tbzitem 或 /tbzskill 查看详情")
-        yield event.plain_result("\n".join(lines))
+        nodes.append(Comp.Node(
+            name="大巴扎小助手", uin="0",
+            content=[Comp.Plain("💡 使用 /tbzitem <名称> 或 /tbzskill <名称> 查看详情")]
+        ))
 
-    @filter.command("tbzitems")
-    async def cmd_items_by_tag(self, event: AstrMessageEvent):
-        """按标签筛选物品"""
-        tag = _extract_query(event.message_str, "tbzitems")
+        try:
+            yield event.chain_result([Comp.Nodes(nodes)])
+        except Exception as e:
+            logger.warning(f"合并转发发送失败，回退逐条发送: {e}")
+            for node in nodes:
+                for item in node.content:
+                    if isinstance(item, Comp.Plain):
+                        yield event.plain_result(item.text)
+                    else:
+                        yield event.chain_result([item])
 
-        if not tag:
-            all_tags = set()
-            for item in self.items:
-                for t in item.get("tags", "").split("|"):
-                    parts = t.strip().split("/")
-                    for p in parts:
-                        p = p.strip()
-                        if p:
-                            all_tags.add(p)
-            sorted_tags = sorted(all_tags)[:40]
-            yield event.plain_result(
-                f"🏷️ 可用标签 (共{len(sorted_tags)}个):\n" +
-                ", ".join(sorted_tags) +
-                "\n\n💡 使用 /tbzitems <标签> 筛选物品"
-            )
-            return
+    @filter.command("tbzupdate")
+    async def cmd_update(self, event: AstrMessageEvent):
+        """从远端更新游戏数据"""
+        yield event.plain_result("⏳ 正在从 BazaarHelper 仓库下载最新数据...")
 
+        data_dir = self.plugin_dir / "data"
+        session = await self._get_session()
         results = []
-        kw = tag.lower()
-        for item in self.items:
-            tags = item.get("tags", "").lower()
-            hidden = item.get("hidden_tags", "").lower()
-            if kw in tags or kw in hidden:
-                results.append(item)
+        success_count = 0
 
-        if not results:
-            yield event.plain_result(f"未找到标签包含「{tag}」的物品。使用 /tbzitems 查看所有标签。")
-            return
+        for filename, url in DATA_FILES.items():
+            try:
+                async with session.get(url) as resp:
+                    if resp.status != 200:
+                        results.append(f"❌ {filename}: HTTP {resp.status}")
+                        continue
+                    raw = await resp.text()
+                    data = json.loads(raw)
+                    filepath = data_dir / filename
+                    with open(filepath, "w", encoding="utf-8") as f:
+                        f.write(raw)
+                    count = len(data) if isinstance(data, (list, dict)) else 0
+                    results.append(f"✅ {filename}: {count}条数据")
+                    success_count += 1
+            except json.JSONDecodeError:
+                results.append(f"❌ {filename}: JSON 解析失败")
+            except Exception as e:
+                results.append(f"❌ {filename}: {e}")
 
-        lines = [f"🏷️ 标签「{tag}」的物品 ({len(results)}个):", ""]
-        for it in results[:20]:
-            tier = _clean_tier(it.get("starting_tier", ""))
-            tier_emoji = TIER_EMOJI.get(tier, "")
-            hero = it.get("heroes", "").split("/")[0].strip()
-            lines.append(f"  {tier_emoji} {it.get('name_cn', '')}({it.get('name_en', '')}) - {hero}")
-        if len(results) > 20:
-            lines.append(f"  ... 还有{len(results) - 20}个结果")
-        lines.append("\n💡 使用 /tbzitem <名称> 查看详情")
+        if success_count > 0:
+            self._load_data()
 
-        yield event.plain_result("\n".join(lines))
-
-    @filter.command("tbztier")
-    async def cmd_items_by_tier(self, event: AstrMessageEvent):
-        """按品质筛选物品"""
-        tier = _extract_query(event.message_str, "tbztier")
-
-        if not tier:
-            yield event.plain_result(
-                "📊 可用品质等级:\n"
-                "  🥉 Bronze (青铜)\n"
-                "  🥈 Silver (白银)\n"
-                "  🥇 Gold (黄金)\n"
-                "  💎 Diamond (钻石)\n\n"
-                "💡 使用 /tbztier <品质> 筛选物品"
-            )
-            return
-
-        tier_lower = tier.lower()
-        tier_map = {
-            "bronze": "Bronze", "silver": "Silver", "gold": "Gold", "diamond": "Diamond",
-            "铜": "Bronze", "青铜": "Bronze", "银": "Silver", "白银": "Silver",
-            "金": "Gold", "黄金": "Gold", "钻石": "Diamond", "钻": "Diamond",
-        }
-        normalized = tier_map.get(tier_lower, tier.capitalize())
-
-        results = [it for it in self.items if normalized in _clean_tier(it.get("starting_tier", ""))]
-
-        if not results:
-            yield event.plain_result(f"未找到品质为「{normalized}」的物品。")
-            return
-
-        tier_emoji = TIER_EMOJI.get(normalized, "")
-        lines = [f"{tier_emoji} {normalized} 品质物品 ({len(results)}个):", ""]
-        for it in results[:20]:
-            hero = it.get("heroes", "").split("/")[0].strip()
-            lines.append(f"  • {it.get('name_cn', '')}({it.get('name_en', '')}) - {hero}")
-        if len(results) > 20:
-            lines.append(f"  ... 还有{len(results) - 20}个结果")
-        lines.append("\n💡 使用 /tbzitem <名称> 查看详情")
-
-        yield event.plain_result("\n".join(lines))
-
-    @filter.command("tbzhero")
-    async def cmd_hero(self, event: AstrMessageEvent):
-        """查询英雄专属物品和技能"""
-        query = _extract_query(event.message_str, "tbzhero")
-        if not query:
-            heroes = set()
-            for item in self.items:
-                hero_str = item.get("heroes", "")
-                if hero_str:
-                    parts = hero_str.split("/")
-                    for p in parts:
-                        p = p.strip()
-                        if p:
-                            heroes.add(p)
-            sorted_heroes = sorted(heroes)[:30]
-            yield event.plain_result(
-                f"🦸 可查询英雄 (共{len(sorted_heroes)}个):\n" +
-                ", ".join(sorted_heroes) +
-                "\n\n💡 使用 /tbzhero <英雄名> 查看专属物品和技能"
-            )
-            return
-
-        kw = query.lower()
-        hero_items = [it for it in self.items if kw in it.get("heroes", "").lower()]
-        hero_skills = [sk for sk in self.skills if kw in sk.get("heroes", "").lower()]
-
-        if not hero_items and not hero_skills:
-            yield event.plain_result(f"未找到英雄「{query}」的专属物品或技能。使用 /tbzhero 查看所有英雄。")
-            return
-
-        lines = [f"🦸 英雄「{query}」的专属内容:", ""]
-
-        if hero_items:
-            lines.append(f"📦 物品 ({len(hero_items)}个):")
-            for it in hero_items[:15]:
-                tier = _clean_tier(it.get("starting_tier", ""))
-                tier_emoji = TIER_EMOJI.get(tier, "")
-                lines.append(f"  {tier_emoji} {it.get('name_cn', '')}({it.get('name_en', '')})")
-            if len(hero_items) > 15:
-                lines.append(f"  ... 还有{len(hero_items) - 15}个")
-            lines.append("")
-
-        if hero_skills:
-            lines.append(f"🎯 技能 ({len(hero_skills)}个):")
-            for sk in hero_skills[:15]:
-                lines.append(f"  • {sk.get('name_cn', '')}({sk.get('name_en', '')})")
-            if len(hero_skills) > 15:
-                lines.append(f"  ... 还有{len(hero_skills) - 15}个")
-
-        lines.append("\n💡 使用 /tbzitem 或 /tbzskill 查看详情")
-        yield event.plain_result("\n".join(lines))
+        summary = (
+            f"📦 数据更新完成 ({success_count}/{len(DATA_FILES)})\n"
+            + "\n".join(results) + "\n\n"
+            f"📊 当前数据: {len(self.monsters)}怪物 | {len(self.items)}物品 | {len(self.skills)}技能"
+        )
+        yield event.plain_result(summary)
 
     def _translate_item_name(self, name_cn: str) -> str:
         for item in self.items:
