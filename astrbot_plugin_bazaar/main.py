@@ -7,8 +7,28 @@ from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
 
 
-TIER_ORDER = {"Bronze": 1, "Silver": 2, "Gold": 3, "Diamond": 4}
 TIER_EMOJI = {"Bronze": "🥉", "Silver": "🥈", "Gold": "🥇", "Diamond": "💎"}
+
+
+def _clean_tier(raw: str) -> str:
+    if not raw:
+        return ""
+    return raw.split("/")[0].strip().split(" ")[0].strip()
+
+
+def _clean_bilingual(raw: str) -> tuple:
+    if not raw:
+        return ("", "")
+    parts = raw.split("/", 1)
+    en = parts[0].strip()
+    cn = parts[1].strip() if len(parts) > 1 else ""
+    return (en, cn)
+
+
+def _get_skill_text(skill_entry) -> str:
+    if isinstance(skill_entry, dict):
+        return skill_entry.get("cn", "") or skill_entry.get("en", "")
+    return str(skill_entry)
 
 
 @register("astrbot_plugin_bazaar", "BazaarHelper", "The Bazaar 游戏数据查询插件，支持怪物、物品、技能搜索", "1.0.0")
@@ -17,35 +37,35 @@ class BazaarPlugin(Star):
         super().__init__(context)
         self.monsters = {}
         self.items = []
+        self.skills = []
         self.plugin_dir = Path(os.path.dirname(os.path.abspath(__file__)))
 
     async def initialize(self):
         self._load_data()
-        logger.info(f"Bazaar 插件加载完成: {len(self.monsters)} 个怪物, {len(self.items)} 个物品")
+        logger.info(
+            f"Bazaar 插件加载完成: {len(self.monsters)} 个怪物, "
+            f"{len(self.items)} 个物品, {len(self.skills)} 个技能"
+        )
 
     def _load_data(self):
-        monsters_path = self.plugin_dir / "data" / "monsters.json"
-        items_path = self.plugin_dir / "data" / "items.json"
+        data_dir = self.plugin_dir / "data"
 
-        try:
-            if monsters_path.exists():
-                with open(monsters_path, "r", encoding="utf-8") as f:
-                    self.monsters = json.load(f)
-            else:
-                logger.warning(f"怪物数据文件不存在: {monsters_path}")
-        except (json.JSONDecodeError, IOError) as e:
-            logger.error(f"加载怪物数据失败: {e}")
-            self.monsters = {}
-
-        try:
-            if items_path.exists():
-                with open(items_path, "r", encoding="utf-8") as f:
-                    self.items = json.load(f)
-            else:
-                logger.warning(f"物品数据文件不存在: {items_path}")
-        except (json.JSONDecodeError, IOError) as e:
-            logger.error(f"加载物品数据失败: {e}")
-            self.items = []
+        for name, attr, default in [
+            ("monsters_db.json", "monsters", {}),
+            ("items_db.json", "items", []),
+            ("skills_db.json", "skills", []),
+        ]:
+            path = data_dir / name
+            try:
+                if path.exists():
+                    with open(path, "r", encoding="utf-8") as f:
+                        setattr(self, attr, json.load(f))
+                else:
+                    logger.warning(f"数据文件不存在: {path}")
+                    setattr(self, attr, default)
+            except (json.JSONDecodeError, IOError) as e:
+                logger.error(f"加载数据失败 ({name}): {e}")
+                setattr(self, attr, default)
 
     def _format_monster_info(self, key: str, monster: dict) -> str:
         name_zh = monster.get("name_zh", key)
@@ -53,55 +73,137 @@ class BazaarPlugin(Star):
 
         lines = [f"🐉 【{name_zh}】({name_en})", ""]
 
+        if monster.get("available"):
+            lines.append(f"📅 出现时间: {monster['available']}")
+        if monster.get("health"):
+            lines.append(f"❤️ 生命值: {monster['health']}")
+        if monster.get("level"):
+            lines.append(f"⭐ 等级: {monster['level']}")
+        if monster.get("combat"):
+            combat = monster["combat"]
+            combat_info = []
+            if combat.get("gold"):
+                combat_info.append(f"💰{combat['gold']}")
+            if combat.get("exp"):
+                combat_info.append(f"📊{combat['exp']}")
+            if combat_info:
+                lines.append(f"🎁 奖励: {' | '.join(combat_info)}")
+        if monster.get("tags"):
+            tags = monster["tags"]
+            if isinstance(tags, list):
+                lines.append(f"🏷️ 标签: {', '.join(tags)}")
+        lines.append("")
+
         skills = monster.get("skills", [])
         if skills:
             lines.append("⚔️ 技能:")
-            for s in skills:
-                tier_emoji = TIER_EMOJI.get(s.get("tier", ""), "")
-                lines.append(f"  {tier_emoji} {s['name']}({s.get('name_en', '')})")
-                lines.append(f"    {s.get('description', '')}")
+            for s in skills[:8]:
+                name = s.get("name", s.get("name_en", ""))
+                name_en = s.get("name_en", "")
+                tier_str = s.get("tier", s.get("current_tier", ""))
+                tier_clean = _clean_tier(tier_str)
+                tier_emoji = TIER_EMOJI.get(tier_clean, "")
+                display_name = name
+                if name_en and name_en != name:
+                    display_name = f"{name}({name_en})"
+                lines.append(f"  {tier_emoji} {display_name} [{tier_str}]")
+                tiers = s.get("tiers", {})
+                if tiers:
+                    current = s.get("current_tier", "").lower()
+                    tier_data = tiers.get(current) or next(
+                        (v for v in tiers.values() if v), None
+                    )
+                    if tier_data and tier_data.get("description"):
+                        for desc_line in tier_data["description"][:2]:
+                            lines.append(f"    {desc_line}")
+            if len(skills) > 8:
+                lines.append(f"  ... 还有{len(skills) - 8}个技能")
             lines.append("")
 
         items = monster.get("items", [])
         if items:
-            lines.append("🎒 专属物品:")
+            lines.append("🎒 物品:")
             seen = set()
+            count = 0
             for item in items:
-                item_key = item.get("id", item["name"])
-                if item_key in seen:
+                item_id = item.get("id", item.get("name", ""))
+                if item_id in seen:
                     continue
-                seen.add(item_key)
-                tier_emoji = TIER_EMOJI.get(item.get("tier", ""), "")
-                lines.append(f"  {tier_emoji} {item['name']}({item.get('name_en', '')})")
-                lines.append(f"    {item.get('description', '')}")
+                seen.add(item_id)
+                count += 1
+                if count > 8:
+                    lines.append(f"  ... 还有{len(set(it.get('id', it.get('name','')) for it in items)) - 8}个物品")
+                    break
+                name = item.get("name", "")
+                name_en = item.get("name_en", "")
+                tier_str = item.get("tier", item.get("current_tier", ""))
+                tier_clean = _clean_tier(tier_str)
+                tier_emoji = TIER_EMOJI.get(tier_clean, "")
+                display_name = name
+                if name_en and name_en != name:
+                    display_name = f"{name}({name_en})"
+                lines.append(f"  {tier_emoji} {display_name} [{tier_str}]")
+                tiers = item.get("tiers", {})
+                if tiers:
+                    current = item.get("current_tier", "").lower()
+                    tier_data = tiers.get(current) or next(
+                        (v for v in tiers.values() if v), None
+                    )
+                    if tier_data and tier_data.get("description"):
+                        lines.append(f"    {tier_data['description'][0]}")
 
         return "\n".join(lines)
 
     def _format_item_info(self, item: dict) -> str:
         name_cn = item.get("name_cn", "")
         name_en = item.get("name_en", "")
-        tier = item.get("tier", "")
-        tier_emoji = TIER_EMOJI.get(tier, "")
+        tier_raw = item.get("starting_tier", "")
+        tier_clean = _clean_tier(tier_raw)
+        tier_emoji = TIER_EMOJI.get(tier_clean, "")
 
-        lines = [f"📦 【{name_cn}】({name_en}) {tier_emoji}{tier}", ""]
+        lines = [f"📦 【{name_cn}】({name_en}) {tier_emoji}{tier_raw}", ""]
 
-        desc = item.get("description", "")
-        if desc:
-            lines.append(f"📝 {desc}")
+        active_skills = item.get("skills", [])
+        if active_skills:
+            lines.append("⚔️ 主动技能:")
+            for sk in active_skills[:5]:
+                lines.append(f"  {_get_skill_text(sk)}")
+            lines.append("")
+
+        passive_skills = item.get("skills_passive", [])
+        if passive_skills:
+            lines.append("🛡️ 被动技能:")
+            for sk in passive_skills[:5]:
+                lines.append(f"  {_get_skill_text(sk)}")
             lines.append("")
 
         details = []
-        if item.get("heroes"):
-            details.append(f"英雄: {item['heroes']}")
+        hero_en, hero_cn = _clean_bilingual(item.get("heroes", ""))
+        if hero_cn:
+            details.append(f"英雄: {hero_cn}({hero_en})")
+        elif hero_en:
+            details.append(f"英雄: {hero_en}")
+
         if item.get("tags"):
             details.append(f"标签: {item['tags']}")
-        if item.get("size"):
-            details.append(f"尺寸: {item['size']}")
-        if "cooldown" in item:
-            cd = item["cooldown"]
+        if item.get("hidden_tags"):
+            details.append(f"隐藏标签: {item['hidden_tags']}")
+
+        size_en, size_cn = _clean_bilingual(item.get("size", ""))
+        if size_cn:
+            details.append(f"尺寸: {size_cn}({size_en})")
+        elif size_en:
+            details.append(f"尺寸: {size_en}")
+
+        cd = item.get("cooldown")
+        if cd is not None:
             details.append(f"冷却: {'被动/无冷却' if cd == 0 else f'{cd}秒'}")
         if item.get("available_tiers"):
             details.append(f"可用品质: {item['available_tiers']}")
+        if item.get("buy_price"):
+            details.append(f"购买价格: {item['buy_price']}")
+        if item.get("sell_price"):
+            details.append(f"出售价格: {item['sell_price']}")
 
         if details:
             lines.append("📊 属性:")
@@ -109,26 +211,89 @@ class BazaarPlugin(Star):
                 lines.append(f"  {d}")
             lines.append("")
 
-        stats = []
         stat_fields = [
-            ("damage_tiers", "伤害"),
-            ("heal_tiers", "治疗"),
-            ("shield_tiers", "护盾"),
-            ("burn_tiers", "灼烧"),
-            ("poison_tiers", "中毒"),
-            ("regen_tiers", "再生"),
-            ("lifesteal_tiers", "吸血"),
-            ("ammo_tiers", "弹药"),
-            ("crit_tiers", "暴击"),
-            ("multicast_tiers", "多重施放"),
+            ("damage", "damage_tiers", "伤害"),
+            ("heal", "heal_tiers", "治疗"),
+            ("shield", "shield_tiers", "护盾"),
+            ("burn", "burn_tiers", "灼烧"),
+            ("poison", "poison_tiers", "中毒"),
+            ("regen", "regen_tiers", "再生"),
+            ("lifesteal", "lifesteal_tiers", "吸血"),
+            ("ammo", "ammo_tiers", "弹药"),
+            ("crit", "crit_tiers", "暴击"),
+            ("multicast", "multicast_tiers", "多重触发"),
         ]
-        for field, label in stat_fields:
-            if item.get(field):
-                stats.append(f"  {label}: {item[field]}")
+        stats = []
+        for val_key, tier_key, label in stat_fields:
+            val = item.get(val_key)
+            tiers_str = item.get(tier_key, "")
+            if val and val != 0:
+                if tiers_str:
+                    stats.append(f"  {label}: {val} (成长: {tiers_str})")
+                else:
+                    stats.append(f"  {label}: {val}")
 
         if stats:
-            lines.append("📈 品质成长:")
+            lines.append("📈 数值:")
             lines.extend(stats)
+            lines.append("")
+
+        enchantments = item.get("enchantments", {})
+        if enchantments and isinstance(enchantments, dict):
+            lines.append(f"✨ 附魔 ({len(enchantments)}种):")
+            for ench_key, ench_data in list(enchantments.items())[:6]:
+                if isinstance(ench_data, dict):
+                    ench_cn = ench_data.get("name_cn", ench_key)
+                    effect = ench_data.get("effect_cn", ench_data.get("effect_en", ""))
+                    lines.append(f"  • {ench_cn}({ench_key}): {effect}")
+            if len(enchantments) > 6:
+                lines.append(f"  ... 还有{len(enchantments) - 6}种附魔")
+
+        return "\n".join(lines)
+
+    def _format_skill_info(self, skill: dict) -> str:
+        name_cn = skill.get("name_cn", "")
+        name_en = skill.get("name_en", "")
+        tier_raw = skill.get("starting_tier", "")
+        tier_clean = _clean_tier(tier_raw)
+        tier_emoji = TIER_EMOJI.get(tier_clean, "")
+
+        lines = [f"🎯 【{name_cn}】({name_en}) {tier_emoji}{tier_raw}", ""]
+
+        desc_cn = skill.get("description_cn", "")
+        desc_en = skill.get("description_en", "")
+        if desc_cn:
+            lines.append(f"📝 {desc_cn}")
+        if desc_en:
+            lines.append(f"📝 {desc_en}")
+        lines.append("")
+
+        hero_en, hero_cn = _clean_bilingual(skill.get("heroes", ""))
+        if hero_cn:
+            lines.append(f"🦸 英雄: {hero_cn}({hero_en})")
+        elif hero_en:
+            lines.append(f"🦸 英雄: {hero_en}")
+
+        if skill.get("available_tiers"):
+            lines.append(f"📊 可用品质: {skill['available_tiers']}")
+
+        size_en, size_cn = _clean_bilingual(skill.get("size", ""))
+        if size_cn:
+            lines.append(f"📏 尺寸: {size_cn}({size_en})")
+
+        if skill.get("tags"):
+            lines.append(f"🏷️ 标签: {skill['tags']}")
+        if skill.get("hidden_tags"):
+            lines.append(f"🏷️ 隐藏标签: {skill['hidden_tags']}")
+
+        descriptions = skill.get("descriptions", [])
+        if descriptions and len(descriptions) > 1:
+            lines.append("")
+            lines.append("📋 各品质描述:")
+            for desc in descriptions[:4]:
+                cn = desc.get("cn", "")
+                if cn:
+                    lines.append(f"  • {cn}")
 
         return "\n".join(lines)
 
@@ -143,15 +308,13 @@ class BazaarPlugin(Star):
                 continue
             for skill in monster.get("skills", []):
                 if (kw in skill.get("name", "").lower() or
-                    kw in skill.get("name_en", "").lower() or
-                    kw in skill.get("description", "").lower()):
+                    kw in skill.get("name_en", "").lower()):
                     results.append((key, monster))
                     break
             else:
                 for item in monster.get("items", []):
                     if (kw in item.get("name", "").lower() or
-                        kw in item.get("name_en", "").lower() or
-                        kw in item.get("description", "").lower()):
+                        kw in item.get("name_en", "").lower()):
                         results.append((key, monster))
                         break
         return results
@@ -163,9 +326,21 @@ class BazaarPlugin(Star):
             if (kw in item.get("name_cn", "").lower() or
                 kw in item.get("name_en", "").lower() or
                 kw in item.get("tags", "").lower() or
-                kw in item.get("heroes", "").lower() or
-                kw in item.get("description", "").lower()):
+                kw in item.get("hidden_tags", "").lower() or
+                kw in item.get("heroes", "").lower()):
                 results.append(item)
+        return results
+
+    def _search_skills(self, keyword: str) -> list:
+        results = []
+        kw = keyword.lower()
+        for skill in self.skills:
+            if (kw in skill.get("name_cn", "").lower() or
+                kw in skill.get("name_en", "").lower() or
+                kw in skill.get("description_cn", "").lower() or
+                kw in skill.get("description_en", "").lower() or
+                kw in skill.get("heroes", "").lower()):
+                results.append(skill)
         return results
 
     @filter.command("bzhelp")
@@ -174,22 +349,26 @@ class BazaarPlugin(Star):
         help_text = (
             "🎮 The Bazaar 数据查询助手\n"
             "━━━━━━━━━━━━━━━━━━\n"
+            f"📊 数据: {len(self.monsters)}怪物 | {len(self.items)}物品 | {len(self.skills)}技能\n\n"
             "📋 可用指令:\n\n"
             "/bzmonster <名称> - 查询怪物信息\n"
             "  示例: /bzmonster 火灵\n"
             "  示例: /bzmonster pyro\n\n"
             "/bzitem <名称> - 查询物品信息\n"
-            "  示例: /bzitem 短剑\n"
-            "  示例: /bzitem sword\n\n"
-            "/bzsearch <关键词> - 搜索怪物和物品\n"
+            "  示例: /bzitem 地下商街\n"
+            "  示例: /bzitem Toolbox\n\n"
+            "/bzskill <名称> - 查询技能信息\n"
+            "  示例: /bzskill 热情如火\n\n"
+            "/bzsearch <关键词> - 搜索怪物、物品和技能\n"
             "  示例: /bzsearch 灼烧\n"
             "  示例: /bzsearch poison\n\n"
             "/bzlist - 列出所有怪物\n\n"
             "/bzitems [标签] - 按标签筛选物品\n"
-            "  示例: /bzitems Weapon\n"
-            "  示例: /bzitems Poison\n\n"
+            "  示例: /bzitems Weapon\n\n"
             "/bztier <品质> - 按品质筛选物品\n"
             "  示例: /bztier Gold\n\n"
+            "/bzhero <英雄名> - 查询英雄专属物品和技能\n"
+            "  示例: /bzhero 朱尔斯\n\n"
             "/bzhelp - 显示此帮助信息\n"
             "━━━━━━━━━━━━━━━━━━\n"
             "数据来源: BazaarHelper"
@@ -221,9 +400,9 @@ class BazaarPlugin(Star):
             if len(results) == 1:
                 found_key, found_monster = results[0]
             elif len(results) > 1:
-                names = [f"  {m.get('name_zh', k)}({m.get('name', '')})" for k, m in results[:10]]
+                names = [f"  {m.get('name_zh', k)}({m.get('name', '')})" for k, m in results[:15]]
                 yield event.plain_result(
-                    f"找到多个匹配结果，请精确输入:\n" + "\n".join(names)
+                    f"找到{len(results)}个匹配结果，请精确输入:\n" + "\n".join(names)
                 )
                 return
             else:
@@ -251,12 +430,18 @@ class BazaarPlugin(Star):
 
         if not found:
             results = self._search_items(query)
-            if len(results) == 1:
+            exact = [it for it in results
+                     if query in it.get("name_cn", "") or query in it.get("name_en", "")]
+            if len(exact) == 1:
+                found = exact[0]
+            elif len(results) == 1:
                 found = results[0]
             elif len(results) > 1:
-                names = [f"  {it.get('name_cn', '')}({it.get('name_en', '')})" for it in results[:10]]
+                display = exact[:15] if exact else results[:15]
+                names = [f"  {it.get('name_cn', '')}({it.get('name_en', '')})" for it in display]
+                total = len(exact) if exact else len(results)
                 yield event.plain_result(
-                    f"找到多个匹配结果，请精确输入:\n" + "\n".join(names)
+                    f"找到{total}个匹配结果，请精确输入:\n" + "\n".join(names)
                 )
                 return
 
@@ -265,10 +450,22 @@ class BazaarPlugin(Star):
                 for mitem in monster.get("items", []):
                     if (mitem.get("name", "").lower() == kw or
                         mitem.get("name_en", "").lower() == kw):
-                        tier_emoji = TIER_EMOJI.get(mitem.get("tier", ""), "")
+                        tier_str = mitem.get("tier", mitem.get("current_tier", ""))
+                        tier_clean = _clean_tier(tier_str)
+                        tier_emoji = TIER_EMOJI.get(tier_clean, "")
+                        desc_parts = []
+                        tiers = mitem.get("tiers", {})
+                        if tiers:
+                            current = mitem.get("current_tier", "").lower()
+                            tier_data = tiers.get(current) or next(
+                                (v for v in tiers.values() if v), None
+                            )
+                            if tier_data and tier_data.get("description"):
+                                desc_parts = tier_data["description"]
+                        desc_text = "\n".join(desc_parts) if desc_parts else "暂无描述"
                         result = (
-                            f"📦 【{mitem['name']}】({mitem.get('name_en', '')}) {tier_emoji}{mitem.get('tier', '')}\n\n"
-                            f"📝 {mitem.get('description', '')}\n\n"
+                            f"📦 【{mitem['name']}】 {tier_emoji}{tier_str}\n\n"
+                            f"📝 {desc_text}\n\n"
                             f"🐉 所属怪物: {monster.get('name_zh', key)}({monster.get('name', '')})"
                         )
                         yield event.plain_result(result)
@@ -280,9 +477,49 @@ class BazaarPlugin(Star):
 
         yield event.plain_result(self._format_item_info(found))
 
+    @filter.command("bzskill")
+    async def cmd_skill(self, event: AstrMessageEvent):
+        """查询技能详细信息"""
+        query = event.message_str.strip()
+        if not query:
+            yield event.plain_result("请输入技能名称，例如: /bzskill 热情如火")
+            return
+
+        kw = query.lower()
+        found = None
+
+        for skill in self.skills:
+            if (skill.get("name_cn", "").lower() == kw or
+                skill.get("name_en", "").lower() == kw):
+                found = skill
+                break
+
+        if not found:
+            results = self._search_skills(query)
+            exact = [sk for sk in results
+                     if query in sk.get("name_cn", "") or query in sk.get("name_en", "")]
+            if len(exact) == 1:
+                found = exact[0]
+            elif len(results) == 1:
+                found = results[0]
+            elif len(results) > 1:
+                display = exact[:15] if exact else results[:15]
+                names = [f"  {sk.get('name_cn', '')}({sk.get('name_en', '')})" for sk in display]
+                total = len(exact) if exact else len(results)
+                yield event.plain_result(
+                    f"找到{total}个匹配结果，请精确输入:\n" + "\n".join(names)
+                )
+                return
+
+        if not found:
+            yield event.plain_result(f"未找到技能「{query}」，请使用 /bzsearch 搜索。")
+            return
+
+        yield event.plain_result(self._format_skill_info(found))
+
     @filter.command("bzsearch")
     async def cmd_search(self, event: AstrMessageEvent):
-        """搜索怪物和物品"""
+        """搜索怪物、物品和技能"""
         query = event.message_str.strip()
         if not query:
             yield event.plain_result("请输入搜索关键词，例如: /bzsearch 灼烧")
@@ -290,8 +527,9 @@ class BazaarPlugin(Star):
 
         monster_results = self._search_monsters(query)
         item_results = self._search_items(query)
+        skill_results = self._search_skills(query)
 
-        if not monster_results and not item_results:
+        if not monster_results and not item_results and not skill_results:
             yield event.plain_result(f"未找到与「{query}」相关的结果。")
             return
 
@@ -308,14 +546,22 @@ class BazaarPlugin(Star):
         if item_results:
             lines.append(f"📦 物品 ({len(item_results)}个):")
             for it in item_results[:8]:
-                tier_emoji = TIER_EMOJI.get(it.get("tier", ""), "")
+                tier = _clean_tier(it.get("starting_tier", ""))
+                tier_emoji = TIER_EMOJI.get(tier, "")
                 lines.append(f"  • {tier_emoji} {it.get('name_cn', '')}({it.get('name_en', '')})")
             if len(item_results) > 8:
                 lines.append(f"  ... 还有{len(item_results) - 8}个结果")
+            lines.append("")
 
-        lines.append("")
-        lines.append("💡 使用 /bzmonster 或 /bzitem 查看详情")
+        if skill_results:
+            lines.append(f"🎯 技能 ({len(skill_results)}个):")
+            for sk in skill_results[:8]:
+                lines.append(f"  • {sk.get('name_cn', '')}({sk.get('name_en', '')})")
+            if len(skill_results) > 8:
+                lines.append(f"  ... 还有{len(skill_results) - 8}个结果")
+            lines.append("")
 
+        lines.append("💡 使用 /bzmonster, /bzitem 或 /bzskill 查看详情")
         yield event.plain_result("\n".join(lines))
 
     @filter.command("bzlist")
@@ -325,17 +571,19 @@ class BazaarPlugin(Star):
             yield event.plain_result("暂无怪物数据。")
             return
 
-        lines = ["🐉 所有怪物列表:", "━━━━━━━━━━━━━━━━━━"]
+        lines = [f"🐉 所有怪物列表 (共{len(self.monsters)}个):", "━━━━━━━━━━━━━━━━━━"]
         for key, monster in self.monsters.items():
             name_zh = monster.get("name_zh", key)
             name_en = monster.get("name", "")
+            avail = monster.get("available", "")
             skill_count = len(monster.get("skills", []))
-            item_count = len(set(it.get("id", it["name"]) for it in monster.get("items", [])))
-            lines.append(f"  • {name_zh}({name_en}) - {skill_count}技能/{item_count}物品")
+            item_count = len(set(
+                it.get("id", it.get("name", "")) for it in monster.get("items", [])
+            ))
+            avail_str = f" [{avail}]" if avail else ""
+            lines.append(f"  • {name_zh}({name_en}){avail_str} - {skill_count}技能/{item_count}物品")
 
-        lines.append(f"\n共 {len(self.monsters)} 个怪物")
-        lines.append("💡 使用 /bzmonster <名称> 查看详情")
-
+        lines.append(f"\n💡 使用 /bzmonster <名称> 查看详情")
         yield event.plain_result("\n".join(lines))
 
     @filter.command("bzitems")
@@ -346,13 +594,15 @@ class BazaarPlugin(Star):
         if not tag:
             all_tags = set()
             for item in self.items:
-                for t in item.get("tags", "").split(","):
-                    t = t.strip()
-                    if t:
-                        all_tags.add(t)
-            sorted_tags = sorted(all_tags)
+                for t in item.get("tags", "").split("|"):
+                    parts = t.strip().split("/")
+                    for p in parts:
+                        p = p.strip()
+                        if p:
+                            all_tags.add(p)
+            sorted_tags = sorted(all_tags)[:40]
             yield event.plain_result(
-                "🏷️ 可用标签:\n" +
+                f"🏷️ 可用标签 (共{len(sorted_tags)}个):\n" +
                 ", ".join(sorted_tags) +
                 "\n\n💡 使用 /bzitems <标签> 筛选物品"
             )
@@ -362,7 +612,8 @@ class BazaarPlugin(Star):
         kw = tag.lower()
         for item in self.items:
             tags = item.get("tags", "").lower()
-            if kw in tags:
+            hidden = item.get("hidden_tags", "").lower()
+            if kw in tags or kw in hidden:
                 results.append(item)
 
         if not results:
@@ -370,11 +621,13 @@ class BazaarPlugin(Star):
             return
 
         lines = [f"🏷️ 标签「{tag}」的物品 ({len(results)}个):", ""]
-        for it in results[:15]:
-            tier_emoji = TIER_EMOJI.get(it.get("tier", ""), "")
-            lines.append(f"  {tier_emoji} {it.get('name_cn', '')}({it.get('name_en', '')}) - {it.get('tier', '')}")
-        if len(results) > 15:
-            lines.append(f"  ... 还有{len(results) - 15}个结果")
+        for it in results[:20]:
+            tier = _clean_tier(it.get("starting_tier", ""))
+            tier_emoji = TIER_EMOJI.get(tier, "")
+            hero = it.get("heroes", "").split("/")[0].strip()
+            lines.append(f"  {tier_emoji} {it.get('name_cn', '')}({it.get('name_en', '')}) - {hero}")
+        if len(results) > 20:
+            lines.append(f"  ... 还有{len(results) - 20}个结果")
         lines.append("\n💡 使用 /bzitem <名称> 查看详情")
 
         yield event.plain_result("\n".join(lines))
@@ -387,20 +640,23 @@ class BazaarPlugin(Star):
         if not tier:
             yield event.plain_result(
                 "📊 可用品质等级:\n"
-                "  🥉 Bronze (铜)\n"
-                "  🥈 Silver (银)\n"
-                "  🥇 Gold (金)\n"
+                "  🥉 Bronze (青铜)\n"
+                "  🥈 Silver (白银)\n"
+                "  🥇 Gold (黄金)\n"
                 "  💎 Diamond (钻石)\n\n"
                 "💡 使用 /bztier <品质> 筛选物品"
             )
             return
 
         tier_lower = tier.lower()
-        tier_map = {"bronze": "Bronze", "silver": "Silver", "gold": "Gold", "diamond": "Diamond",
-                     "铜": "Bronze", "银": "Silver", "金": "Gold", "钻石": "Diamond"}
+        tier_map = {
+            "bronze": "Bronze", "silver": "Silver", "gold": "Gold", "diamond": "Diamond",
+            "铜": "Bronze", "青铜": "Bronze", "银": "Silver", "白银": "Silver",
+            "金": "Gold", "黄金": "Gold", "钻石": "Diamond", "钻": "Diamond",
+        }
         normalized = tier_map.get(tier_lower, tier.capitalize())
 
-        results = [it for it in self.items if it.get("tier", "") == normalized]
+        results = [it for it in self.items if normalized in _clean_tier(it.get("starting_tier", ""))]
 
         if not results:
             yield event.plain_result(f"未找到品质为「{normalized}」的物品。")
@@ -408,12 +664,65 @@ class BazaarPlugin(Star):
 
         tier_emoji = TIER_EMOJI.get(normalized, "")
         lines = [f"{tier_emoji} {normalized} 品质物品 ({len(results)}个):", ""]
-        for it in results[:15]:
-            lines.append(f"  • {it.get('name_cn', '')}({it.get('name_en', '')}) - {it.get('heroes', 'Common')}")
-        if len(results) > 15:
-            lines.append(f"  ... 还有{len(results) - 15}个结果")
+        for it in results[:20]:
+            hero = it.get("heroes", "").split("/")[0].strip()
+            lines.append(f"  • {it.get('name_cn', '')}({it.get('name_en', '')}) - {hero}")
+        if len(results) > 20:
+            lines.append(f"  ... 还有{len(results) - 20}个结果")
         lines.append("\n💡 使用 /bzitem <名称> 查看详情")
 
+        yield event.plain_result("\n".join(lines))
+
+    @filter.command("bzhero")
+    async def cmd_hero(self, event: AstrMessageEvent):
+        """查询英雄专属物品和技能"""
+        query = event.message_str.strip()
+        if not query:
+            heroes = set()
+            for item in self.items:
+                hero_str = item.get("heroes", "")
+                if hero_str:
+                    parts = hero_str.split("/")
+                    for p in parts:
+                        p = p.strip()
+                        if p:
+                            heroes.add(p)
+            sorted_heroes = sorted(heroes)[:30]
+            yield event.plain_result(
+                f"🦸 可查询英雄 (共{len(sorted_heroes)}个):\n" +
+                ", ".join(sorted_heroes) +
+                "\n\n💡 使用 /bzhero <英雄名> 查看专属物品和技能"
+            )
+            return
+
+        kw = query.lower()
+        hero_items = [it for it in self.items if kw in it.get("heroes", "").lower()]
+        hero_skills = [sk for sk in self.skills if kw in sk.get("heroes", "").lower()]
+
+        if not hero_items and not hero_skills:
+            yield event.plain_result(f"未找到英雄「{query}」的专属物品或技能。使用 /bzhero 查看所有英雄。")
+            return
+
+        lines = [f"🦸 英雄「{query}」的专属内容:", ""]
+
+        if hero_items:
+            lines.append(f"📦 物品 ({len(hero_items)}个):")
+            for it in hero_items[:15]:
+                tier = _clean_tier(it.get("starting_tier", ""))
+                tier_emoji = TIER_EMOJI.get(tier, "")
+                lines.append(f"  {tier_emoji} {it.get('name_cn', '')}({it.get('name_en', '')})")
+            if len(hero_items) > 15:
+                lines.append(f"  ... 还有{len(hero_items) - 15}个")
+            lines.append("")
+
+        if hero_skills:
+            lines.append(f"🎯 技能 ({len(hero_skills)}个):")
+            for sk in hero_skills[:15]:
+                lines.append(f"  • {sk.get('name_cn', '')}({sk.get('name_en', '')})")
+            if len(hero_skills) > 15:
+                lines.append(f"  ... 还有{len(hero_skills) - 15}个")
+
+        lines.append("\n💡 使用 /bzitem 或 /bzskill 查看详情")
         yield event.plain_result("\n".join(lines))
 
     async def terminate(self):

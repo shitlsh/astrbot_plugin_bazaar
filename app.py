@@ -13,10 +13,12 @@ COMMANDS = {
     "/bzhelp": "cmd_help",
     "/bzmonster": "cmd_monster",
     "/bzitem": "cmd_item",
+    "/bzskill": "cmd_skill",
     "/bzsearch": "cmd_search",
     "/bzlist": "cmd_list",
     "/bzitems": "cmd_items_by_tag",
     "/bztier": "cmd_items_by_tier",
+    "/bzhero": "cmd_hero",
 }
 
 

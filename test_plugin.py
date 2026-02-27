@@ -23,7 +23,7 @@ async def test_command(plugin, cmd_func, message_str, label):
 
 
 async def main():
-    print("🎮 Bazaar 插件测试")
+    print("🎮 Bazaar 插件测试 (完整数据)")
     print("=" * 60)
 
     ctx = Context()
@@ -32,37 +32,35 @@ async def main():
 
     await test_command(plugin, plugin.cmd_help, "", "/bzhelp")
 
-    await test_command(plugin, plugin.cmd_list, "", "/bzlist")
+    await test_command(plugin, plugin.cmd_list, "", "/bzlist (部分)")
 
     await test_command(plugin, plugin.cmd_monster, "火灵", "/bzmonster 火灵")
 
-    await test_command(plugin, plugin.cmd_monster, "pyro", "/bzmonster pyro")
+    await test_command(plugin, plugin.cmd_monster, "Kyver Drone", "/bzmonster Kyver Drone")
 
-    await test_command(plugin, plugin.cmd_monster, "blizzard", "/bzmonster blizzard")
+    await test_command(plugin, plugin.cmd_item, "地下商街", "/bzitem 地下商街")
 
-    await test_command(plugin, plugin.cmd_item, "短剑", "/bzitem 短剑")
+    await test_command(plugin, plugin.cmd_item, "Toolbox", "/bzitem Toolbox")
 
-    await test_command(plugin, plugin.cmd_item, "Fire Staff", "/bzitem Fire Staff")
-
-    await test_command(plugin, plugin.cmd_item, "余烬", "/bzitem 余烬 (monster item)")
+    await test_command(plugin, plugin.cmd_skill, "热情如火", "/bzskill 热情如火")
 
     await test_command(plugin, plugin.cmd_search, "灼烧", "/bzsearch 灼烧")
 
     await test_command(plugin, plugin.cmd_search, "poison", "/bzsearch poison")
 
-    await test_command(plugin, plugin.cmd_items_by_tag, "", "/bzitems (no tag)")
-
     await test_command(plugin, plugin.cmd_items_by_tag, "Weapon", "/bzitems Weapon")
 
     await test_command(plugin, plugin.cmd_items_by_tier, "Gold", "/bztier Gold")
 
-    await test_command(plugin, plugin.cmd_items_by_tier, "", "/bztier (no tier)")
+    await test_command(plugin, plugin.cmd_items_by_tier, "钻石", "/bztier 钻石")
 
-    await test_command(plugin, plugin.cmd_monster, "不存在", "/bzmonster 不存在")
+    await test_command(plugin, plugin.cmd_hero, "朱尔斯", "/bzhero 朱尔斯")
+
+    await test_command(plugin, plugin.cmd_hero, "", "/bzhero (list)")
+
+    await test_command(plugin, plugin.cmd_monster, "不存在怪物", "/bzmonster 不存在怪物")
 
     await test_command(plugin, plugin.cmd_item, "", "/bzitem (empty)")
-
-    await test_command(plugin, plugin.cmd_monster, "灵", "/bzmonster 灵 (partial)")
 
     await plugin.terminate()
     print("\n" + "=" * 60)
