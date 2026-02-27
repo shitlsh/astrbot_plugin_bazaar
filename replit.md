@@ -41,6 +41,7 @@ test_plugin.py             # 自动化测试脚本
 - `/bzitems [标签]` - 按标签筛选物品
 - `/bztier <品质>` - 按品质筛选物品
 - `/bzhero <英雄名>` - 查看英雄专属内容
+- `/bzbuild <物品名> [数量]` - 查询推荐阵容（默认3条，最多10条）
 
 ## 图片卡片渲染
 - 使用 Pillow 生成深色主题 PNG 卡片
@@ -49,8 +50,14 @@ test_plugin.py             # 自动化测试脚本
 - 渲染失败时自动回退到纯文本输出
 - 需要中文字体支持（WenQuanYi Zen Hei）
 
+## 阵容查询
+- `/bzbuild` 通过 bazaar-builds.net 的 WordPress REST API 搜索阵容
+- 支持中文物品名自动翻译为英文进行搜索
+- 默认返回3条结果，用户可指定1-10条
+- API端点: `https://bazaar-builds.net/wp-json/wp/v2/posts?search=...`
+
 ## 技术栈
 - Python 3.11
 - Pillow (图片生成)
-- aiohttp (异步HTTP，用于获取游戏图片)
+- aiohttp (异步HTTP，用于获取游戏图片和阵容API)
 - AstrBot 插件框架

@@ -19,6 +19,7 @@ COMMANDS = {
     "/bzitems": "cmd_items_by_tag",
     "/bztier": "cmd_items_by_tier",
     "/bzhero": "cmd_hero",
+    "/bzbuild": "cmd_build",
 }
 
 

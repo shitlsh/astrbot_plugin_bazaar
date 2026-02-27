@@ -1,10 +1,16 @@
 import json
 import os
+import html as html_module
 from pathlib import Path
+
+import aiohttp
 
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
+
+BUILDS_API = "https://bazaar-builds.net/wp-json/wp/v2"
+DEFAULT_BUILD_COUNT = 3
 
 
 TIER_EMOJI = {"Bronze": "🥉", "Silver": "🥈", "Gold": "🥇", "Diamond": "💎"}
@@ -377,9 +383,12 @@ class BazaarPlugin(Star):
             "  示例: /bztier Gold\n\n"
             "/bzhero <英雄名> - 查询英雄专属物品和技能\n"
             "  示例: /bzhero 朱尔斯\n\n"
+            "/bzbuild <物品名> [数量] - 查询推荐阵容\n"
+            "  示例: /bzbuild 符文匕首\n"
+            "  示例: /bzbuild Runic Daggers 5\n\n"
             "/bzhelp - 显示此帮助信息\n"
             "━━━━━━━━━━━━━━━━━━\n"
-            "数据来源: BazaarHelper"
+            "数据来源: BazaarHelper | bazaar-builds.net"
         )
         yield event.plain_result(help_text)
 
@@ -752,6 +761,124 @@ class BazaarPlugin(Star):
                 lines.append(f"  ... 还有{len(hero_skills) - 15}个")
 
         lines.append("\n💡 使用 /bzitem 或 /bzskill 查看详情")
+        yield event.plain_result("\n".join(lines))
+
+    def _translate_item_name(self, name_cn: str) -> str:
+        for item in self.items:
+            if item.get("name_cn", "").lower() == name_cn.lower():
+                return item.get("name_en", name_cn)
+        return name_cn
+
+    async def _fetch_builds(self, search_term: str, count: int) -> list:
+        url = f"{BUILDS_API}/posts"
+        params = {
+            "search": search_term,
+            "per_page": count,
+            "_fields": "id,title,link,date,excerpt,featured_media",
+        }
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                    if resp.status != 200:
+                        return []
+                    posts = await resp.json()
+
+                builds = []
+                for post in posts:
+                    title = html_module.unescape(post.get("title", {}).get("rendered", ""))
+                    excerpt_html = post.get("excerpt", {}).get("rendered", "")
+                    excerpt_text = html_module.unescape(
+                        excerpt_html.replace("<p>", "").replace("</p>", "").replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
+                    ).strip()
+
+                    thumb_url = ""
+                    media_id = post.get("featured_media", 0)
+                    if media_id:
+                        media_url = f"{BUILDS_API}/media/{media_id}?_fields=media_details"
+                        try:
+                            async with session.get(media_url, timeout=aiohttp.ClientTimeout(total=10)) as mresp:
+                                if mresp.status == 200:
+                                    media = await mresp.json()
+                                    sizes = media.get("media_details", {}).get("sizes", {})
+                                    if "medium" in sizes:
+                                        thumb_url = sizes["medium"]["source_url"]
+                                    elif "large" in sizes:
+                                        thumb_url = sizes["large"]["source_url"]
+                        except Exception:
+                            pass
+
+                    builds.append({
+                        "title": title,
+                        "link": post.get("link", ""),
+                        "date": post.get("date", "")[:10],
+                        "excerpt": excerpt_text[:200],
+                        "thumb_url": thumb_url,
+                    })
+                return builds
+        except Exception as e:
+            logger.warning(f"查询阵容失败: {e}")
+            return []
+
+    @filter.command("bzbuild")
+    async def cmd_build(self, event: AstrMessageEvent):
+        """查询物品推荐阵容"""
+        query = event.message_str.strip()
+        if not query:
+            yield event.plain_result(
+                "请输入物品名称查询推荐阵容，例如:\n"
+                "  /bzbuild 符文匕首\n"
+                "  /bzbuild Runic Daggers\n"
+                "  /bzbuild 放大镜 5\n\n"
+                "默认显示前3个结果，可在末尾指定数量(1-10)。"
+            )
+            return
+
+        parts = query.rsplit(maxsplit=1)
+        count = DEFAULT_BUILD_COUNT
+        if len(parts) == 2 and parts[1].isdigit():
+            count = max(1, min(int(parts[1]), 10))
+            query = parts[0].strip()
+
+        search_term = query
+        is_cn = any('\u4e00' <= c <= '\u9fff' for c in query)
+        if is_cn:
+            en_name = self._translate_item_name(query)
+            if en_name != query:
+                search_term = en_name
+
+        builds = await self._fetch_builds(search_term, count)
+
+        if not builds:
+            hint = f"（已翻译为: {search_term}）" if search_term != query else ""
+            yield event.plain_result(
+                f"未找到与「{query}」{hint}相关的阵容。\n"
+                f"请尝试使用英文物品名搜索，或访问:\n"
+                f"https://bazaar-builds.net/?s={search_term.replace(' ', '+')}"
+            )
+            return
+
+        if self.renderer:
+            try:
+                img_bytes = await self.renderer.render_build_card(query, search_term, builds)
+                yield event.image_result(bytes_data=img_bytes)
+                return
+            except Exception as e:
+                logger.warning(f"阵容卡片渲染失败，回退文本: {e}")
+
+        lines = [f"🏗️ 「{query}」相关阵容 (来自 bazaar-builds.net):"]
+        if search_term != query:
+            lines.append(f"🔍 搜索词: {search_term}")
+        lines.append("")
+
+        for i, build in enumerate(builds, 1):
+            lines.append(f"━━ {i}. {build['title']} ━━")
+            lines.append(f"📅 {build['date']}")
+            if build['excerpt']:
+                lines.append(f"💬 {build['excerpt']}")
+            lines.append(f"🔗 {build['link']}")
+            lines.append("")
+
+        lines.append(f"💡 更多阵容: https://bazaar-builds.net/?s={search_term.replace(' ', '+')}")
         yield event.plain_result("\n".join(lines))
 
     async def terminate(self):

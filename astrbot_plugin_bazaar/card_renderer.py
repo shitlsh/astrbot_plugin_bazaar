@@ -643,6 +643,98 @@ class CardRenderer:
                         y += 18
                     y += 4
 
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        return buf.getvalue()
+        buf_skill = io.BytesIO()
+        img.save(buf_skill, format="PNG")
+        return buf_skill.getvalue()
+
+    async def render_build_card(self, query: str, search_term: str, builds: list) -> bytes:
+        font_title = self._font(24)
+        font_subtitle = self._font(18)
+        font_body = self._font(15)
+        font_small = self._font(13)
+        font_link = self._font(12)
+
+        card_width = 560
+        padding = 20
+        content_width = card_width - padding * 2
+
+        header_h = 60
+        body_h = 0
+
+        for build in builds:
+            bh = 0
+            title_lines = self._wrap_text(build["title"], font_subtitle, content_width - 10)
+            bh += len(title_lines) * 22
+            bh += 20
+            if build.get("excerpt"):
+                excerpt_lines = self._wrap_text(build["excerpt"], font_small, content_width - 10)
+                bh += len(excerpt_lines) * 17
+                bh += 6
+            bh += 18
+            bh += 16
+            body_h += bh
+
+        body_h += (len(builds) - 1) * 10
+        footer_h = 30
+
+        total_height = header_h + body_h + footer_h + padding * 3
+        img = Image.new("RGBA", (card_width, total_height), COLORS["bg"])
+        draw = ImageDraw.Draw(img)
+
+        y = padding
+        self._draw_rounded_rect(draw, (0, 0, card_width, header_h + padding), 12, COLORS["header_bg"])
+
+        title_text = f"🏗️ 「{query}」推荐阵容"
+        draw.text((padding, y + 6), title_text, font=font_title, fill=COLORS["text"])
+        sub = f"来源: bazaar-builds.net | 共{len(builds)}条结果"
+        if search_term != query:
+            sub = f"搜索: {search_term} | " + sub
+        draw.text((padding, y + 34), sub, font=font_small, fill=COLORS["text_dim"])
+
+        y = header_h + padding + 10
+
+        for i, build in enumerate(builds):
+            num_badge = f" {i + 1} "
+            bbox = font_body.getbbox(num_badge)
+            bw = bbox[2] - bbox[0] + 10
+            draw.rounded_rectangle(
+                (padding, y, padding + bw, y + 22), radius=4, fill=COLORS["accent"]
+            )
+            draw.text((padding + 5, y + 2), num_badge.strip(), font=font_body, fill=COLORS["bg"])
+
+            title_x = padding + bw + 8
+            title_lines = self._wrap_text(build["title"], font_subtitle, content_width - bw - 10)
+            for j, tl in enumerate(title_lines):
+                draw.text((title_x if j == 0 else padding + 10, y), tl, font=font_subtitle, fill=COLORS["text"])
+                y += 22
+
+            y += 4
+            draw.text((padding + 10, y), f"📅 {build['date']}", font=font_small, fill=COLORS["text_dim"])
+            y += 16
+
+            if build.get("excerpt"):
+                excerpt_lines = self._wrap_text(build["excerpt"], font_small, content_width - 10)
+                for el in excerpt_lines:
+                    draw.text((padding + 10, y), el, font=font_small, fill=COLORS["text_dim"])
+                    y += 17
+                y += 6
+
+            draw.text((padding + 10, y), f"🔗 {build['link']}", font=font_link, fill=COLORS["accent"])
+            y += 18
+
+            if i < len(builds) - 1:
+                y += 4
+                draw.line((padding + 10, y, card_width - padding - 10, y), fill=COLORS["divider"], width=1)
+                y += 6
+
+        y += 10
+        more_url = f"https://bazaar-builds.net/?s={search_term.replace(' ', '+')}"
+        more_text = f"💡 更多阵容: {more_url}"
+        more_lines = self._wrap_text(more_text, font_link, content_width)
+        for ml in more_lines:
+            draw.text((padding, y), ml, font=font_link, fill=COLORS["green"])
+            y += 16
+
+        buf_build = io.BytesIO()
+        img.save(buf_build, format="PNG")
+        return buf_build.getvalue()
