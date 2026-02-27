@@ -92,24 +92,24 @@ sudo yum install wqy-zenhei-fonts
 
 | 指令 | 说明 | 示例 |
 |------|------|------|
-| `/bzhelp` | 查看帮助信息 | `/bzhelp` |
-| `/bzmonster <名称>` | 查询怪物详情（图片卡片） | `/bzmonster 火灵` |
-| `/bzitem <名称>` | 查询物品详情（图片卡片） | `/bzitem 放大镜` |
-| `/bzskill <名称>` | 查询技能详情（图片卡片） | `/bzskill 热情如火` |
-| `/bzsearch <关键词>` | 搜索怪物、物品和技能 | `/bzsearch 灼烧` |
-| `/bzitems [标签]` | 按标签筛选物品 | `/bzitems Weapon` |
-| `/bztier <品质>` | 按品质筛选物品 | `/bztier Gold` |
-| `/bzhero <英雄名>` | 查看英雄专属内容 | `/bzhero 朱尔斯` |
-| `/bzbuild <物品名> [数量]` | 查询推荐阵容 | `/bzbuild 符文匕首 5` |
+| `/tbzhelp` | 查看帮助信息 | `/tbzhelp` |
+| `/tbzmonster <名称>` | 查询怪物详情（图片卡片） | `/tbzmonster 火灵` |
+| `/tbzitem <名称>` | 查询物品详情（图片卡片） | `/tbzitem 放大镜` |
+| `/tbzskill <名称>` | 查询技能详情（图片卡片） | `/tbzskill 热情如火` |
+| `/tbzsearch <关键词>` | 搜索怪物、物品和技能 | `/tbzsearch 灼烧` |
+| `/tbzitems [标签]` | 按标签筛选物品 | `/tbzitems Weapon` |
+| `/tbztier <品质>` | 按品质筛选物品 | `/tbztier Gold` |
+| `/tbzhero <英雄名>` | 查看英雄专属内容 | `/tbzhero 朱尔斯` |
+| `/tbzbuild <物品名> [数量]` | 查询推荐阵容 | `/tbzbuild 符文匕首 5` |
 
 所有指令均支持中英文输入。
 
-### /bzbuild 说明
+### /tbzbuild 说明
 
 - 输入中文物品名会自动翻译为英文进行搜索
 - 默认展示前 3 条结果，可在末尾指定数量（1-10）
 - 每条结果包含阵容截图和原文链接
-- 示例：`/bzbuild Runic Daggers` 或 `/bzbuild 符文匕首 5`
+- 示例：`/tbzbuild Runic Daggers` 或 `/tbzbuild 符文匕首 5`
 
 ## 项目结构
 

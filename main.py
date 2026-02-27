@@ -55,7 +55,7 @@ def _resolve_search(results, query, name_func, not_found_msg):
     return None, f"找到{total}个匹配结果，请精确输入:\n" + "\n".join(names)
 
 
-@register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、阵容查询，图片卡片展示", "v1.0.0")
+@register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、阵容查询，图片卡片展示", "v1.0.1")
 class BazaarPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
@@ -385,7 +385,7 @@ class BazaarPlugin(Star):
                 results.append(skill)
         return results
 
-    @filter.command("bzhelp")
+    @filter.command("tbzhelp")
     async def cmd_help(self, event: AstrMessageEvent):
         """查看 Bazaar 插件帮助信息"""
         help_text = (
@@ -393,38 +393,38 @@ class BazaarPlugin(Star):
             "━━━━━━━━━━━━━━━━━━\n"
             f"📊 数据: {len(self.monsters)}怪物 | {len(self.items)}物品 | {len(self.skills)}技能\n\n"
             "📋 可用指令:\n\n"
-            "/bzmonster <名称> - 查询怪物信息\n"
-            "  示例: /bzmonster 火灵\n"
-            "  示例: /bzmonster pyro\n\n"
-            "/bzitem <名称> - 查询物品信息\n"
-            "  示例: /bzitem 地下商街\n"
-            "  示例: /bzitem Toolbox\n\n"
-            "/bzskill <名称> - 查询技能信息\n"
-            "  示例: /bzskill 热情如火\n\n"
-            "/bzsearch <关键词> - 搜索怪物、物品和技能\n"
-            "  示例: /bzsearch 灼烧\n"
-            "  示例: /bzsearch poison\n\n"
-            "/bzitems [标签] - 按标签筛选物品\n"
-            "  示例: /bzitems Weapon\n\n"
-            "/bztier <品质> - 按品质筛选物品\n"
-            "  示例: /bztier Gold\n\n"
-            "/bzhero <英雄名> - 查询英雄专属物品和技能\n"
-            "  示例: /bzhero 朱尔斯\n\n"
-            "/bzbuild <物品名> [数量] - 查询推荐阵容\n"
-            "  示例: /bzbuild 符文匕首\n"
-            "  示例: /bzbuild Runic Daggers 5\n\n"
-            "/bzhelp - 显示此帮助信息\n"
+            "/tbzmonster <名称> - 查询怪物信息\n"
+            "  示例: /tbzmonster 火灵\n"
+            "  示例: /tbzmonster pyro\n\n"
+            "/tbzitem <名称> - 查询物品信息\n"
+            "  示例: /tbzitem 地下商街\n"
+            "  示例: /tbzitem Toolbox\n\n"
+            "/tbzskill <名称> - 查询技能信息\n"
+            "  示例: /tbzskill 热情如火\n\n"
+            "/tbzsearch <关键词> - 搜索怪物、物品和技能\n"
+            "  示例: /tbzsearch 灼烧\n"
+            "  示例: /tbzsearch poison\n\n"
+            "/tbzitems [标签] - 按标签筛选物品\n"
+            "  示例: /tbzitems Weapon\n\n"
+            "/tbztier <品质> - 按品质筛选物品\n"
+            "  示例: /tbztier Gold\n\n"
+            "/tbzhero <英雄名> - 查询英雄专属物品和技能\n"
+            "  示例: /tbzhero 朱尔斯\n\n"
+            "/tbzbuild <物品名> [数量] - 查询推荐阵容\n"
+            "  示例: /tbzbuild 符文匕首\n"
+            "  示例: /tbzbuild Runic Daggers 5\n\n"
+            "/tbzhelp - 显示此帮助信息\n"
             "━━━━━━━━━━━━━━━━━━\n"
             "数据来源: BazaarHelper | bazaar-builds.net"
         )
         yield event.plain_result(help_text)
 
-    @filter.command("bzmonster")
+    @filter.command("tbzmonster")
     async def cmd_monster(self, event: AstrMessageEvent):
         """查询怪物详细信息"""
         query = event.message_str.strip()
         if not query:
-            yield event.plain_result("请输入怪物名称，例如: /bzmonster 火灵")
+            yield event.plain_result("请输入怪物名称，例如: /tbzmonster 火灵")
             return
 
         kw = query.lower()
@@ -446,7 +446,7 @@ class BazaarPlugin(Star):
                 return f"{m.get('name_zh', k)}({m.get('name', '')})"
             found, msg = _resolve_search(
                 results, query, monster_name,
-                f"未找到怪物「{query}」，请使用 /bzsearch 搜索。"
+                f"未找到怪物「{query}」，请使用 /tbzsearch 搜索。"
             )
             if msg:
                 yield event.plain_result(msg)
@@ -462,12 +462,12 @@ class BazaarPlugin(Star):
                 logger.warning(f"怪物卡片渲染失败，回退文本: {e}")
         yield event.plain_result(self._format_monster_info(found_key, found_monster))
 
-    @filter.command("bzitem")
+    @filter.command("tbzitem")
     async def cmd_item(self, event: AstrMessageEvent):
         """查询物品详细信息"""
         query = event.message_str.strip()
         if not query:
-            yield event.plain_result("请输入物品名称，例如: /bzitem 短剑")
+            yield event.plain_result("请输入物品名称，例如: /tbzitem 短剑")
             return
 
         kw = query.lower()
@@ -518,7 +518,7 @@ class BazaarPlugin(Star):
                         return
 
         if not found:
-            yield event.plain_result(f"未找到物品「{query}」，请使用 /bzsearch 搜索。")
+            yield event.plain_result(f"未找到物品「{query}」，请使用 /tbzsearch 搜索。")
             return
 
         if self.renderer:
@@ -530,12 +530,12 @@ class BazaarPlugin(Star):
                 logger.warning(f"物品卡片渲染失败，回退文本: {e}")
         yield event.plain_result(self._format_item_info(found))
 
-    @filter.command("bzskill")
+    @filter.command("tbzskill")
     async def cmd_skill(self, event: AstrMessageEvent):
         """查询技能详细信息"""
         query = event.message_str.strip()
         if not query:
-            yield event.plain_result("请输入技能名称，例如: /bzskill 热情如火")
+            yield event.plain_result("请输入技能名称，例如: /tbzskill 热情如火")
             return
 
         kw = query.lower()
@@ -553,7 +553,7 @@ class BazaarPlugin(Star):
                 return f"{r.get('name_cn', '')}({r.get('name_en', '')})"
             found, msg = _resolve_search(
                 results, query, skill_name,
-                f"未找到技能「{query}」，请使用 /bzsearch 搜索。"
+                f"未找到技能「{query}」，请使用 /tbzsearch 搜索。"
             )
             if msg:
                 yield event.plain_result(msg)
@@ -568,12 +568,12 @@ class BazaarPlugin(Star):
                 logger.warning(f"技能卡片渲染失败，回退文本: {e}")
         yield event.plain_result(self._format_skill_info(found))
 
-    @filter.command("bzsearch")
+    @filter.command("tbzsearch")
     async def cmd_search(self, event: AstrMessageEvent):
         """搜索怪物、物品和技能"""
         query = event.message_str.strip()
         if not query:
-            yield event.plain_result("请输入搜索关键词，例如: /bzsearch 灼烧")
+            yield event.plain_result("请输入搜索关键词，例如: /tbzsearch 灼烧")
             return
 
         monster_results = self._search_monsters(query)
@@ -612,10 +612,10 @@ class BazaarPlugin(Star):
                 lines.append(f"  ... 还有{len(skill_results) - 8}个结果")
             lines.append("")
 
-        lines.append("💡 使用 /bzmonster, /bzitem 或 /bzskill 查看详情")
+        lines.append("💡 使用 /tbzmonster, /tbzitem 或 /tbzskill 查看详情")
         yield event.plain_result("\n".join(lines))
 
-    @filter.command("bzitems")
+    @filter.command("tbzitems")
     async def cmd_items_by_tag(self, event: AstrMessageEvent):
         """按标签筛选物品"""
         tag = event.message_str.strip()
@@ -633,7 +633,7 @@ class BazaarPlugin(Star):
             yield event.plain_result(
                 f"🏷️ 可用标签 (共{len(sorted_tags)}个):\n" +
                 ", ".join(sorted_tags) +
-                "\n\n💡 使用 /bzitems <标签> 筛选物品"
+                "\n\n💡 使用 /tbzitems <标签> 筛选物品"
             )
             return
 
@@ -646,7 +646,7 @@ class BazaarPlugin(Star):
                 results.append(item)
 
         if not results:
-            yield event.plain_result(f"未找到标签包含「{tag}」的物品。使用 /bzitems 查看所有标签。")
+            yield event.plain_result(f"未找到标签包含「{tag}」的物品。使用 /tbzitems 查看所有标签。")
             return
 
         lines = [f"🏷️ 标签「{tag}」的物品 ({len(results)}个):", ""]
@@ -657,11 +657,11 @@ class BazaarPlugin(Star):
             lines.append(f"  {tier_emoji} {it.get('name_cn', '')}({it.get('name_en', '')}) - {hero}")
         if len(results) > 20:
             lines.append(f"  ... 还有{len(results) - 20}个结果")
-        lines.append("\n💡 使用 /bzitem <名称> 查看详情")
+        lines.append("\n💡 使用 /tbzitem <名称> 查看详情")
 
         yield event.plain_result("\n".join(lines))
 
-    @filter.command("bztier")
+    @filter.command("tbztier")
     async def cmd_items_by_tier(self, event: AstrMessageEvent):
         """按品质筛选物品"""
         tier = event.message_str.strip()
@@ -673,7 +673,7 @@ class BazaarPlugin(Star):
                 "  🥈 Silver (白银)\n"
                 "  🥇 Gold (黄金)\n"
                 "  💎 Diamond (钻石)\n\n"
-                "💡 使用 /bztier <品质> 筛选物品"
+                "💡 使用 /tbztier <品质> 筛选物品"
             )
             return
 
@@ -698,11 +698,11 @@ class BazaarPlugin(Star):
             lines.append(f"  • {it.get('name_cn', '')}({it.get('name_en', '')}) - {hero}")
         if len(results) > 20:
             lines.append(f"  ... 还有{len(results) - 20}个结果")
-        lines.append("\n💡 使用 /bzitem <名称> 查看详情")
+        lines.append("\n💡 使用 /tbzitem <名称> 查看详情")
 
         yield event.plain_result("\n".join(lines))
 
-    @filter.command("bzhero")
+    @filter.command("tbzhero")
     async def cmd_hero(self, event: AstrMessageEvent):
         """查询英雄专属物品和技能"""
         query = event.message_str.strip()
@@ -720,7 +720,7 @@ class BazaarPlugin(Star):
             yield event.plain_result(
                 f"🦸 可查询英雄 (共{len(sorted_heroes)}个):\n" +
                 ", ".join(sorted_heroes) +
-                "\n\n💡 使用 /bzhero <英雄名> 查看专属物品和技能"
+                "\n\n💡 使用 /tbzhero <英雄名> 查看专属物品和技能"
             )
             return
 
@@ -729,7 +729,7 @@ class BazaarPlugin(Star):
         hero_skills = [sk for sk in self.skills if kw in sk.get("heroes", "").lower()]
 
         if not hero_items and not hero_skills:
-            yield event.plain_result(f"未找到英雄「{query}」的专属物品或技能。使用 /bzhero 查看所有英雄。")
+            yield event.plain_result(f"未找到英雄「{query}」的专属物品或技能。使用 /tbzhero 查看所有英雄。")
             return
 
         lines = [f"🦸 英雄「{query}」的专属内容:", ""]
@@ -751,7 +751,7 @@ class BazaarPlugin(Star):
             if len(hero_skills) > 15:
                 lines.append(f"  ... 还有{len(hero_skills) - 15}个")
 
-        lines.append("\n💡 使用 /bzitem 或 /bzskill 查看详情")
+        lines.append("\n💡 使用 /tbzitem 或 /tbzskill 查看详情")
         yield event.plain_result("\n".join(lines))
 
     def _translate_item_name(self, name_cn: str) -> str:
@@ -820,16 +820,16 @@ class BazaarPlugin(Star):
             logger.warning(f"查询阵容失败: {e}")
             return []
 
-    @filter.command("bzbuild")
+    @filter.command("tbzbuild")
     async def cmd_build(self, event: AstrMessageEvent):
         """查询物品推荐阵容"""
         query = event.message_str.strip()
         if not query:
             yield event.plain_result(
                 "请输入物品名称查询推荐阵容，例如:\n"
-                "  /bzbuild 符文匕首\n"
-                "  /bzbuild Runic Daggers\n"
-                "  /bzbuild 放大镜 5\n\n"
+                "  /tbzbuild 符文匕首\n"
+                "  /tbzbuild Runic Daggers\n"
+                "  /tbzbuild 放大镜 5\n\n"
                 "默认显示前3个结果，可在末尾指定数量(1-10)。"
             )
             return
