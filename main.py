@@ -1,3 +1,4 @@
+import inspect
 import json
 import os
 import re
@@ -96,7 +97,7 @@ CONFIG_KEY_MAP = {
 }
 
 
-@register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、阵容查询，图片卡片展示，AI 人格预设与工具自动调用", "v1.0.5")
+@register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、阵容查询，图片卡片展示，AI 人格预设与工具自动调用", "v1.0.5a")
 class BazaarPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
@@ -261,24 +262,30 @@ class BazaarPlugin(Star):
         try:
             pm = self.context.persona_manager
             try:
-                existing = pm.get_persona(PERSONA_ID)
-                if existing:
-                    pm.update_persona(
+                result = pm.get_persona(PERSONA_ID)
+                if inspect.isawaitable(result):
+                    result = await result
+                if result:
+                    update_result = pm.update_persona(
                         persona_id=PERSONA_ID,
                         system_prompt=SYSTEM_PROMPT,
                         begin_dialogs=BEGIN_DIALOGS,
                         tools=TOOLS,
                     )
+                    if inspect.isawaitable(update_result):
+                        await update_result
                     logger.info("已更新「大巴扎小助手」人格预设")
                     return
             except (ValueError, Exception):
                 pass
-            pm.create_persona(
+            create_result = pm.create_persona(
                 persona_id=PERSONA_ID,
                 system_prompt=SYSTEM_PROMPT,
                 begin_dialogs=BEGIN_DIALOGS,
                 tools=TOOLS,
             )
+            if inspect.isawaitable(create_result):
+                await create_result
             logger.info("已创建「大巴扎小助手」人格预设")
         except Exception as e:
             logger.warning(f"人格预设注册失败（不影响插件使用）: {e}")

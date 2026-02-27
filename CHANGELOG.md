@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.5a
+
+### Bugfix
+
+- 修复人格预设注册：persona_manager 的方法可能是异步的，改用 `inspect.isawaitable()` 兼容同步/异步两种 API
+
 ## v1.0.5
 
 ### Features
