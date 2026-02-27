@@ -35,6 +35,7 @@ BazaarHelper 是一个基于 Tauri 构建的 The Bazaar 游戏辅助工具，提
 | 怪物 | 120 | `monsters_db.json` |
 | 物品 | 958 | `items_db.json` |
 | 技能 | 448 | `skills_db.json` |
+| 事件 | 39 | `event_detail.json` |
 
 ### Bazaar Builds
 
@@ -98,6 +99,7 @@ sudo yum install wqy-zenhei-fonts
 | `/tbzmonster <名称>` | 查询怪物详情（图片卡片） | `/tbzmonster 火灵` |
 | `/tbzitem <名称>` | 查询物品详情（图片卡片） | `/tbzitem 放大镜` |
 | `/tbzskill <名称>` | 查询技能详情（图片卡片） | `/tbzskill 热情如火` |
+| `/tbzevent <名称>` | 查询事件详情 | `/tbzevent 奇异蘑菇` |
 | `/tbzsearch <条件>` | 多条件搜索 | `/tbzsearch 杜利中型灼烧` |
 | `/tbzbuild <物品名> [数量]` | 查询推荐阵容 | `/tbzbuild 符文匕首 5` |
 | `/tbzalias` | 别名管理 | `/tbzalias list hero` |
@@ -149,13 +151,14 @@ sudo yum install wqy-zenhei-fonts
 
 ## AI 工具集成
 
-插件注册了 5 个 AI 工具（`@llm_tool`），当 AstrBot 配置了 LLM 后，AI 可以在对话中自动调用这些功能，无需用户手动输入指令：
+插件注册了 6 个 AI 工具（`@llm_tool`），当 AstrBot 配置了支持函数调用的 LLM 后，AI 可以在对话中自动调用这些功能，无需用户手动输入指令：
 
 | 工具名 | 功能 | 触发场景示例 |
 |--------|------|-------------|
 | `bazaar_query_item` | 查询物品详情 | "放大镜是什么效果？" |
 | `bazaar_query_monster` | 查询怪物详情 | "火灵有什么技能？" |
 | `bazaar_query_skill` | 查询技能详情 | "热情如火这个技能怎么样？" |
+| `bazaar_query_event` | 查询事件详情 | "奇异蘑菇事件怎么选？" |
 | `bazaar_search` | 多条件搜索 | "有哪些黄金武器？" |
 | `bazaar_query_build` | 查询推荐阵容 | "海盗船锚怎么搭配？" |
 
@@ -205,6 +208,7 @@ AI 会根据用户的自然语言自动选择合适的工具调用，并将结�
     ├── items_db.json    # 物品数据库
     ├── monsters_db.json # 怪物数据库
     ├── skills_db.json   # 技能数据库
+    ├── event_detail.json # 事件数据库
     ├── aliases.json     # 别名配置（向下兼容）
     └── cache/           # 图片缓存（自动创建）
 ```
@@ -224,6 +228,7 @@ cd astrbot_plugin_bazaar/data/
 curl -o items_db.json https://raw.githubusercontent.com/Duangi/BazaarHelper/main/src-tauri/resources/items_db.json
 curl -o monsters_db.json https://raw.githubusercontent.com/Duangi/BazaarHelper/main/src-tauri/resources/monsters_db.json
 curl -o skills_db.json https://raw.githubusercontent.com/Duangi/BazaarHelper/main/src-tauri/resources/skills_db.json
+curl -o event_detail.json https://raw.githubusercontent.com/Duangi/BazaarHelper/main/src-tauri/resources/event_detail.json
 ```
 
 ## 致谢

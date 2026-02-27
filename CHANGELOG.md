@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.0.6
+
+### Features
+
+- 新增事件数据支持：加载 `event_detail.json`（39个游戏事件），包含事件选项、描述、图标
+  - `/tbzevent <名称>` — 查询事件详情（选项及描述）
+  - `bazaar_query_event` — 新增 AI 工具，LLM 可自动查询事件信息
+  - `/tbzsearch` 搜索结果现包含事件匹配
+  - `/tbzupdate` 同步更新事件数据
+
+### Improvements
+
+- 阵容查询过滤优化：新增 `BUILD_POSITIVE_PATTERN` 正向匹配，双重过滤（黑名单 + 正向特征检查）更准确过滤非阵容内容
+- 扩展阵容黑名单词汇：新增 new feature、announcement、preview、season、guide、tutorial、tier list、ranking 等过滤词
+- 智能分词实体名保护：`_smart_tokenize` 在拆分前检查完整词是否为已知实体名（物品/怪物/技能/事件），避免"装甲核心"被错误拆分为"装甲"+"核心"
+- AI 人格预设绑定工具增至 6 个（新增 `bazaar_query_event`）
+- `/tbzhelp` 新增 AI 工具使用说明，提示需要支持函数调用的 LLM 模型
+
 ## v1.0.5a
 
 ### Bugfix

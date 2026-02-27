@@ -16,7 +16,10 @@ BUILDS_API = "https://bazaar-builds.net/wp-json/wp/v2"
 DEFAULT_BUILD_COUNT = 5
 
 BUILD_FILTER_PATTERNS = re.compile(
-    r'(?i)\b(?:patch|hotfix|update|changelog|maintenance|downtime|release\s*note|dev\s*blog|news)\b'
+    r'(?i)\b(?:patch|hotfix|update|changelog|maintenance|downtime|release\s*note|dev\s*blog|news|new\s*feature|announcement|preview|season\s*\d|guide|tutorial|tier\s*list|ranking)\b'
+)
+BUILD_POSITIVE_PATTERN = re.compile(
+    r'(?i)(?:build|10-\d|legend|#\d{3,}|comp|lineup|loadout|deck|setup|阵容)'
 )
 
 TIER_EMOJI = {"Bronze": "🥉", "Silver": "🥈", "Gold": "🥇", "Diamond": "💎"}
@@ -74,6 +77,7 @@ DATA_FILES = {
     "items_db.json": f"{GITHUB_RAW}/items_db.json",
     "monsters_db.json": f"{GITHUB_RAW}/monsters_db.json",
     "skills_db.json": f"{GITHUB_RAW}/skills_db.json",
+    "event_detail.json": f"{GITHUB_RAW}/event_detail.json",
 }
 
 TIER_MAP = {
@@ -97,7 +101,7 @@ CONFIG_KEY_MAP = {
 }
 
 
-@register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、阵容查询，图片卡片展示，AI 人格预设与工具自动调用", "v1.0.5a")
+@register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、事件、阵容查询，图片卡片展示，AI 人格预设与工具自动调用", "v1.0.6")
 class BazaarPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
@@ -105,7 +109,9 @@ class BazaarPlugin(Star):
         self.monsters = {}
         self.items = []
         self.skills = []
+        self.events = []
         self.aliases: dict[str, dict[str, str]] = {}
+        self._entity_names: set = set()
         self.plugin_dir = Path(os.path.dirname(os.path.abspath(__file__)))
         self.renderer = None
         self._session: aiohttp.ClientSession | None = None
@@ -221,7 +227,8 @@ class BazaarPlugin(Star):
         await self._register_persona()
         logger.info(
             f"Bazaar 插件加载完成: {len(self.monsters)} 个怪物, "
-            f"{len(self.items)} 个物品, {len(self.skills)} 个技能"
+            f"{len(self.items)} 个物品, {len(self.skills)} 个技能, "
+            f"{len(self.events)} 个事件"
         )
 
     async def _register_persona(self):
@@ -237,7 +244,8 @@ class BazaarPlugin(Star):
             "- bazaar_query_item: 查询物品详情（属性、技能、附魔、任务等）\n"
             "- bazaar_query_monster: 查询怪物详情（血量、技能、掉落等）\n"
             "- bazaar_query_skill: 查询技能详情（描述、适用英雄等）\n"
-            "- bazaar_search: 多条件搜索物品/怪物/技能\n"
+            "- bazaar_query_event: 查询事件选项和奖励\n"
+            "- bazaar_search: 多条件搜索物品/怪物/技能/事件\n"
             "- bazaar_query_build: 查询社区推荐阵容\n\n"
             "重要规则：\n"
             "- 当用户提到任何可能是游戏内容的名词时（如物品名、怪物名、英雄名），优先使用工具查询，不要凭空编造信息\n"
@@ -256,6 +264,7 @@ class BazaarPlugin(Star):
             "bazaar_query_item",
             "bazaar_query_monster",
             "bazaar_query_skill",
+            "bazaar_query_event",
             "bazaar_search",
             "bazaar_query_build",
         ]
@@ -327,12 +336,57 @@ class BazaarPlugin(Star):
             vocab[en.lower()] = ("tier", en)
         self._vocab = vocab
         self._vocab_sorted = sorted(vocab.keys(), key=len, reverse=True)
+        names = set()
+        for item in self.items:
+            cn = item.get("name_cn", "").strip()
+            en = item.get("name_en", "").strip()
+            if cn:
+                names.add(cn.lower())
+            if en:
+                names.add(en.lower())
+        for key, monster in self.monsters.items():
+            names.add(key.lower())
+            zh = monster.get("name_zh", "").strip()
+            en = monster.get("name", "").strip()
+            if zh:
+                names.add(zh.lower())
+            if en:
+                names.add(en.lower())
+        for skill in self.skills:
+            cn = skill.get("name_cn", "").strip()
+            en = skill.get("name_en", "").strip()
+            if cn:
+                names.add(cn.lower())
+            if en:
+                names.add(en.lower())
+        for ev in self.events:
+            n = ev.get("name", "").strip()
+            ne = ev.get("name_en", "").strip()
+            if n:
+                names.add(n.lower())
+            if ne:
+                names.add(ne.lower())
+        self._entity_names = names
+
+    def _is_entity_name(self, text: str) -> bool:
+        tl = text.lower()
+        if tl in self._entity_names:
+            return True
+        for name in self._entity_names:
+            if len(tl) >= 2 and tl in name:
+                return True
+        return False
 
     def _smart_tokenize(self, query: str) -> list:
+        if self._is_entity_name(query):
+            return [query]
         tokens = query.split()
         result = []
         for token in tokens:
             if ":" in token:
+                result.append(token)
+                continue
+            if self._is_entity_name(token):
                 result.append(token)
                 continue
             has_cjk = any('\u4e00' <= c <= '\u9fff' for c in token)
@@ -371,6 +425,7 @@ class BazaarPlugin(Star):
             ("monsters_db.json", "monsters", {}),
             ("items_db.json", "items", []),
             ("skills_db.json", "skills", []),
+            ("event_detail.json", "events", []),
         ]:
             path = data_dir / name
             try:
@@ -626,6 +681,53 @@ class BazaarPlugin(Star):
 
         return "\n".join(lines)
 
+    def _format_event_info(self, event_data: dict) -> str:
+        name = event_data.get("name", "")
+        name_en = event_data.get("name_en", "")
+        url = event_data.get("url", "")
+
+        lines = [f"🎲 【{name}】({name_en})", ""]
+
+        if url:
+            lines.append(f"🔗 {url}")
+            lines.append("")
+
+        choices = event_data.get("choices", [])
+        if choices:
+            lines.append(f"📋 选项 ({len(choices)}个):")
+            for i, choice in enumerate(choices, 1):
+                c_name_zh = choice.get("name_zh", "")
+                c_name_en = choice.get("name", "")
+                desc_zh = choice.get("description_zh", "")
+                desc_en = choice.get("description", "")
+                display_name = c_name_zh if c_name_zh else c_name_en
+                if c_name_zh and c_name_en:
+                    display_name = f"{c_name_zh}({c_name_en})"
+                lines.append(f"  {i}. {display_name}")
+                desc = desc_zh if desc_zh else desc_en
+                if desc:
+                    lines.append(f"     {desc}")
+            lines.append("")
+
+        return "\n".join(lines)
+
+    def _search_events(self, keyword: str) -> list:
+        results = []
+        kw = keyword.lower()
+        for ev in self.events:
+            if (kw in ev.get("name", "").lower() or
+                kw in ev.get("name_en", "").lower()):
+                results.append(ev)
+                continue
+            for choice in ev.get("choices", []):
+                if (kw in choice.get("name", "").lower() or
+                    kw in choice.get("name_zh", "").lower() or
+                    kw in choice.get("description_zh", "").lower() or
+                    kw in choice.get("description", "").lower()):
+                    results.append(ev)
+                    break
+        return results
+
     def _search_monsters(self, keyword: str) -> list:
         results = []
         kw = keyword.lower()
@@ -678,7 +780,7 @@ class BazaarPlugin(Star):
         help_text = (
             "🎮 The Bazaar 数据查询助手\n"
             "━━━━━━━━━━━━━━━━━━\n"
-            f"📊 数据: {len(self.monsters)}怪物 | {len(self.items)}物品 | {len(self.skills)}技能\n\n"
+            f"📊 数据: {len(self.monsters)}怪物 | {len(self.items)}物品 | {len(self.skills)}技能 | {len(self.events)}事件\n\n"
             "📋 可用指令:\n\n"
             "/tbzmonster <名称> - 查询怪物详情(图片卡片)\n"
             "  示例: /tbzmonster 火灵\n\n"
@@ -686,6 +788,8 @@ class BazaarPlugin(Star):
             "  示例: /tbzitem 地下商街\n\n"
             "/tbzskill <名称> - 查询技能详情(图片卡片)\n"
             "  示例: /tbzskill 热情如火\n\n"
+            "/tbzevent <名称> - 查询事件选项\n"
+            "  示例: /tbzevent 奇异蘑菇\n\n"
             "/tbzsearch <条件> - 智能多条件搜索\n"
             "  直接连写: /tbzsearch 杜利中型灼烧\n"
             "  空格分隔: /tbzsearch 马克 黄金 武器\n"
@@ -700,7 +804,8 @@ class BazaarPlugin(Star):
             "/tbzupdate - 从远端更新游戏数据\n\n"
             "/tbzhelp - 显示此帮助信息\n"
             "━━━━━━━━━━━━━━━━━━\n"
-            "数据来源: BazaarHelper | bazaar-builds.net"
+            "数据来源: BazaarHelper | bazaar-builds.net\n\n"
+            "💡 AI 工具: 本插件支持 AI 自动调用，需要 AstrBot 配置支持函数调用的 LLM 模型"
         )
         yield event.plain_result(help_text)
 
@@ -856,6 +961,38 @@ class BazaarPlugin(Star):
                 logger.warning(f"技能卡片渲染失败，回退文本: {e}")
         yield event.plain_result(self._format_skill_info(found))
 
+    @filter.command("tbzevent")
+    async def cmd_event(self, event: AstrMessageEvent):
+        """查询事件详细信息"""
+        query = _extract_query(event.message_str, "tbzevent")
+        if not query:
+            yield event.plain_result("请输入事件名称，例如: /tbzevent 奇异蘑菇")
+            return
+
+        query = self._resolve_alias(query)
+        kw = query.lower()
+        found = None
+
+        for ev in self.events:
+            if (ev.get("name", "").lower() == kw or
+                ev.get("name_en", "").lower() == kw):
+                found = ev
+                break
+
+        if not found:
+            results = self._search_events(query)
+            def event_name(r):
+                return f"{r.get('name', '')}({r.get('name_en', '')})"
+            found, msg = _resolve_search(
+                results, query, event_name,
+                f"未找到事件「{query}」。可用事件共 {len(self.events)} 个。"
+            )
+            if msg:
+                yield event.plain_result(msg)
+                return
+
+        yield event.plain_result(self._format_event_info(found))
+
     def _parse_search_conditions(self, query: str) -> dict:
         conditions = {"keyword": "", "tags": [], "tiers": [], "heroes": [], "sizes": []}
         keywords = []
@@ -1005,7 +1142,7 @@ class BazaarPlugin(Star):
 
     @filter.command("tbzsearch")
     async def cmd_search(self, event: AstrMessageEvent):
-        """多条件搜索怪物、物品和技能"""
+        """多条件搜索怪物、物品、技能和事件"""
         self._reload_aliases_if_changed()
         query = _extract_query(event.message_str, "tbzsearch")
         if not query:
@@ -1018,8 +1155,9 @@ class BazaarPlugin(Star):
         item_results = self._filter_items(conditions)
         skill_results = self._filter_skills(conditions) if not conditions["tiers"] and not conditions["tags"] and not conditions.get("sizes") else []
         monster_results = self._search_monsters(conditions["keyword"]) if conditions["keyword"] and not has_filters else []
+        event_results = self._search_events(conditions["keyword"]) if conditions["keyword"] and not has_filters else []
 
-        if not monster_results and not item_results and not skill_results:
+        if not monster_results and not item_results and not skill_results and not event_results:
             yield event.plain_result(f"未找到与「{query}」相关的结果。\n使用 /tbzsearch 查看搜索帮助。")
             return
 
@@ -1036,7 +1174,7 @@ class BazaarPlugin(Star):
             parsed_parts.append(f"关键词:{conditions['keyword']}")
         parsed_hint = " | ".join(parsed_parts)
 
-        total = len(monster_results) + len(item_results) + len(skill_results)
+        total = len(monster_results) + len(item_results) + len(skill_results) + len(event_results)
 
         nodes = []
         header = f"🔍 搜索「{query}」的结果 (共{total}条)"
@@ -1093,9 +1231,19 @@ class BazaarPlugin(Star):
                     content=[Comp.Plain("\n".join(lines))]
                 ))
 
+        if event_results:
+            lines = [f"🎲 事件 ({len(event_results)}个):"]
+            for ev in event_results:
+                choices_count = len(ev.get("choices", []))
+                lines.append(f"  • {ev.get('name', '')}({ev.get('name_en', '')}) - {choices_count}个选项")
+            nodes.append(Comp.Node(
+                name="大巴扎小助手", uin="0",
+                content=[Comp.Plain("\n".join(lines))]
+            ))
+
         nodes.append(Comp.Node(
             name="大巴扎小助手", uin="0",
-            content=[Comp.Plain("💡 使用 /tbzitem <名称> 或 /tbzskill <名称> 查看详情")]
+            content=[Comp.Plain("💡 使用 /tbzitem /tbzskill /tbzevent <名称> 查看详情")]
         ))
 
         try:
@@ -1145,7 +1293,7 @@ class BazaarPlugin(Star):
         summary = (
             f"📦 数据更新完成 ({success_count}/{len(DATA_FILES)})\n"
             + "\n".join(results) + "\n\n"
-            f"📊 当前数据: {len(self.monsters)}怪物 | {len(self.items)}物品 | {len(self.skills)}技能"
+            f"📊 当前数据: {len(self.monsters)}怪物 | {len(self.items)}物品 | {len(self.skills)}技能 | {len(self.events)}事件"
         )
         yield event.plain_result(summary)
 
@@ -1306,7 +1454,10 @@ class BazaarPlugin(Star):
                     break
                 title = html_module.unescape(post.get("title", {}).get("rendered", ""))
                 if BUILD_FILTER_PATTERNS.search(title):
-                    logger.debug(f"阵容查询过滤非阵容内容: {title}")
+                    logger.debug(f"阵容查询过滤非阵容内容(黑名单): {title}")
+                    continue
+                if not BUILD_POSITIVE_PATTERN.search(title):
+                    logger.debug(f"阵容查询过滤非阵容内容(无阵容特征): {title}")
                     continue
                 excerpt_raw = post.get("excerpt", {}).get("rendered", "")
                 excerpt_text = html_module.unescape(_strip_html(excerpt_raw))
@@ -1526,9 +1677,38 @@ class BazaarPlugin(Star):
 
         yield event.plain_result(self._format_skill_info(found))
 
+    @filter.llm_tool(name="bazaar_query_event")
+    async def tool_query_event(self, event: AstrMessageEvent, event_name: str):
+        '''查询 The Bazaar (大巴扎) 卡牌游戏中的事件/随机事件详情。The Bazaar 游戏中玩家在对战间隙会遇到各种事件，每个事件有多个选项可以选择，不同选项会获得不同的奖励。当用户询问某个游戏内事件的选项、奖励时，请调用此工具。
+
+        Args:
+            event_name(string): The Bazaar 游戏事件名称，支持中文或英文。例如：奇异蘑菇、A Strange Mushroom
+        '''
+        query = self._resolve_alias(event_name)
+        kw = query.lower()
+        found = None
+
+        for ev in self.events:
+            if (ev.get("name", "").lower() == kw or
+                ev.get("name_en", "").lower() == kw):
+                found = ev
+                break
+
+        if not found:
+            results = self._search_events(query)
+            def ev_name_fn(r):
+                return f"{r.get('name', '')}({r.get('name_en', '')})"
+            found, msg = _resolve_search(results, query, ev_name_fn,
+                f"未找到事件「{event_name}」。")
+            if msg:
+                yield event.plain_result(msg)
+                return
+
+        yield event.plain_result(self._format_event_info(found))
+
     @filter.llm_tool(name="bazaar_search")
     async def tool_search(self, event: AstrMessageEvent, query: str):
-        '''在 The Bazaar (大巴扎) 卡牌游戏数据库中搜索物品、怪物和技能。支持按关键词、英雄(如 Vanessa/Pygmalien/Dooley/Stelle/Jules/Mak)、标签(如 Weapon/Shield/Food)、品质(Bronze/Silver/Gold/Diamond) 等多条件搜索。当用户想要查找游戏中某一类物品、按条件筛选、或者问"有哪些xxx"时，请调用此工具。
+        '''在 The Bazaar (大巴扎) 卡牌游戏数据库中搜索物品、怪物、技能和事件。支持按关键词、英雄(如 Vanessa/Pygmalien/Dooley/Stelle/Jules/Mak)、标签(如 Weapon/Shield/Food)、品质(Bronze/Silver/Gold/Diamond) 等多条件搜索。当用户想要查找游戏中某一类物品、按条件筛选、或者问"有哪些xxx"时，请调用此工具。
 
         Args:
             query(string): 搜索条件。可以是关键词、英雄名、标签名等。例如：灼烧、武器、黄金护盾、Vanessa Weapon。支持前缀语法如 tag:Weapon hero:Mak tier:Gold
@@ -1540,13 +1720,14 @@ class BazaarPlugin(Star):
         item_results = self._filter_items(conditions)
         skill_results = self._filter_skills(conditions) if not conditions["tiers"] and not conditions["tags"] and not conditions.get("sizes") else []
         monster_results = self._search_monsters(conditions["keyword"]) if conditions["keyword"] and not has_filters else []
+        event_results = self._search_events(conditions["keyword"]) if conditions["keyword"] and not has_filters else []
 
-        if not monster_results and not item_results and not skill_results:
+        if not monster_results and not item_results and not skill_results and not event_results:
             yield event.plain_result(f"未找到与「{query}」相关的结果。")
             return
 
         lines = []
-        total = len(monster_results) + len(item_results) + len(skill_results)
+        total = len(monster_results) + len(item_results) + len(skill_results) + len(event_results)
         lines.append(f"搜索「{query}」的结果 (共{total}条):")
 
         if monster_results:
@@ -1571,6 +1752,13 @@ class BazaarPlugin(Star):
                 lines.append(f"  - {sk.get('name_cn', '')}({sk.get('name_en', '')})")
             if len(skill_results) > 10:
                 lines.append(f"  ... 还有{len(skill_results) - 10}个")
+
+        if event_results:
+            lines.append(f"\n事件 ({len(event_results)}个):")
+            for ev in event_results[:10]:
+                lines.append(f"  - {ev.get('name', '')}({ev.get('name_en', '')})")
+            if len(event_results) > 10:
+                lines.append(f"  ... 还有{len(event_results) - 10}个")
 
         yield event.plain_result("\n".join(lines))
 

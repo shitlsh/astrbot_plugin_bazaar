@@ -7,6 +7,7 @@
 - 120 个怪物 (monsters_db.json)
 - 958 个物品 (items_db.json)
 - 448 个技能 (skills_db.json)
+- 39 个事件 (event_detail.json)
 
 数据来源于 BazaarHelper 项目 `src-tauri/resources/` 目录的本地 JSON 数据库文件。支持通过 `/tbzupdate` 在线更新。
 
@@ -27,6 +28,7 @@
     ├── items_db.json      # 物品数据库 (958条)
     ├── monsters_db.json   # 怪物数据库 (120条)
     ├── skills_db.json     # 技能数据库 (448条)
+    ├── event_detail.json  # 事件数据库 (39条)
     ├── aliases.json       # 别名配置（向下兼容，无config时使用）
     └── cache/             # 图片缓存目录（自动创建）
 ```
@@ -36,26 +38,29 @@
 - `/tbzmonster <名称>` - 查询怪物信息（输出图片卡片）
 - `/tbzitem <名称>` - 查询物品信息（输出图片卡片，含任务信息）
 - `/tbzskill <名称>` - 查询技能信息（输出图片卡片）
-- `/tbzsearch <条件>` - 多条件搜索（支持 tag:/tier:/hero:/size: 前缀组合，合并转发输出）
+- `/tbzevent <名称>` - 查询事件详情（选项及描述）
+- `/tbzsearch <条件>` - 多条件搜索（支持 tag:/tier:/hero:/size: 前缀组合，合并转发输出，含事件结果）
 - `/tbzbuild <物品名> [数量]` - 查询推荐阵容（默认5条，最多10条，合并转发输出）
 - `/tbzalias` - 别名管理（list/add/del）
 - `/tbzupdate` - 从 BazaarHelper 仓库更新游戏数据
 
 ## AI 工具 (@llm_tool)
-- 5 个 `@filter.llm_tool` 注册到 AstrBot LLM 工具链，AI 对话中自动调用：
+- 6 个 `@filter.llm_tool` 注册到 AstrBot LLM 工具链，AI 对话中自动调用：
   - `bazaar_query_item` — 查询物品详情（参数: item_name）
   - `bazaar_query_monster` — 查询怪物详情（参数: monster_name）
   - `bazaar_query_skill` — 查询技能详情（参数: skill_name）
+  - `bazaar_query_event` — 查询事件详情（参数: event_name）
   - `bazaar_search` — 多条件搜索（参数: query）
   - `bazaar_query_build` — 查询推荐阵容（参数: query, count）
 - 工具返回纯文本格式（非图片），供 AI 整合到回复中
+- 需要 AstrBot 配置支持函数调用的 LLM 模型才能使用 AI 工具
 - 复用现有的 `_resolve_alias()`, `_search_*()`, `_filter_*()`, `_translate_build_query()` 等方法
 
 ## AI 人格预设
 - `_register_persona()` 在 `initialize()` 中调用，通过 `self.context.persona_manager` 注册
 - persona_id: `bazaar_helper`，包含游戏背景、英雄列表、工具使用规则的系统提示词
 - begin_dialogs: 2 条开场对话（user/assistant 交替）
-- tools: 绑定 5 个 bazaar_* 工具，确保人格模式下优先调用
+- tools: 绑定 6 个 bazaar_* 工具（含 bazaar_query_event），确保人格模式下优先调用
 - 幂等注册：已存在则 update_persona，不存在则 create_persona
 
 ## 别名与配置系统
@@ -95,7 +100,7 @@
 
 ## 数据更新
 - `/tbzupdate` 从 BazaarHelper GitHub 仓库下载最新 JSON 数据
-- 下载地址: `https://raw.githubusercontent.com/Duangi/BazaarHelper/main/src-tauri/resources/{items_db,monsters_db,skills_db}.json`
+- 下载地址: `https://raw.githubusercontent.com/Duangi/BazaarHelper/main/src-tauri/resources/{items_db,monsters_db,skills_db,event_detail}.json`
 - 下载后验证 JSON 格式，写入 `data/` 目录并热重载
 
 ## 架构要点
