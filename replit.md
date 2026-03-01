@@ -86,10 +86,13 @@
 - WordPress REST API
 - 作为 BazaarForge 的回退/补充数据源
 
-## API 缓存
-- `_cached_request(key, ttl, fetch_fn)` 通用 TTL 内存缓存
-- 阵容: 12小时、Tier List: 12小时、Steam新闻: 30分钟、物品UUID映射: 60分钟
-- 纯内存，不落盘
+## 缓存系统
+- `_cached_request(key, ttl, fetch_fn)` 通用 TTL 内存缓存（API 数据）
+- `_get_img_cache` / `_set_img_cache` 渲染图片缓存（PNG bytes）
+- API 数据 TTL: 阵容=12h、Tier List=12h、Steam新闻=30min、物品UUID映射=60min
+- 图片缓存 TTL: Tier List=12h（与数据同步）、商人卡片=12h
+- 图片缓存避免重复下载缩略图和重新渲染，第二次查询同英雄/商人时直接返回已渲染 PNG
+- 纯内存，不落盘；同一 `_cache` 字典，key 前缀 `img:` 区分
 
 ## 事件数据增强
 - `_enrich_events()` 在 `_load_data()` 末尾调用

@@ -213,6 +213,15 @@ class BazaarPlugin(Star):
             self._cache[key] = (now, data)
         return data
 
+    def _get_img_cache(self, key: str, ttl: int) -> bytes | None:
+        entry = self._cache.get(key)
+        if entry and (time.time() - entry[0]) < ttl:
+            return entry[1]
+        return None
+
+    def _set_img_cache(self, key: str, data: bytes):
+        self._cache[key] = (time.time(), data)
+
     def _resolve_hero_name(self, query: str) -> str | None:
         ql = query.strip().lower()
         hero_map = {**{k.lower(): v for k, v in HERO_EN_MAP.items()},
@@ -2540,6 +2549,13 @@ class BazaarPlugin(Star):
                 return
 
         hero_cn = HERO_CN_MAP.get(hero_en, hero_en)
+
+        img_cache_key = f"img:tierlist:{hero_en}"
+        cached_img = self._get_img_cache(img_cache_key, CACHE_TTL_TIERLIST)
+        if cached_img and self.renderer:
+            yield event.chain_result([Comp.Image.fromBytes(cached_img)])
+            return
+
         yield event.plain_result(f"⏳ 正在从 BazaarForge 获取 {hero_cn}({hero_en}) 物品评级...")
 
         tier_items = await self._fetch_tierlist(hero_en)
@@ -2552,6 +2568,7 @@ class BazaarPlugin(Star):
         if self.renderer:
             try:
                 img_bytes = await self.renderer.render_tierlist_card(hero_en, hero_cn, tier_items)
+                self._set_img_cache(img_cache_key, img_bytes)
                 yield event.chain_result([Comp.Image.fromBytes(img_bytes)])
                 return
             except Exception as e:
@@ -2662,8 +2679,15 @@ class BazaarPlugin(Star):
                 return
 
         if self.renderer:
+            merchant_id = found.get("id") or found.get("name_slug", "")
+            img_cache_key = f"img:merchant:{merchant_id}"
+            cached_img = self._get_img_cache(img_cache_key, CACHE_TTL_BUILDS)
+            if cached_img:
+                yield event.chain_result([Comp.Image.fromBytes(cached_img)])
+                return
             try:
                 img_bytes = await self.renderer.render_merchant_card(found)
+                self._set_img_cache(img_cache_key, img_bytes)
                 yield event.chain_result([Comp.Image.fromBytes(img_bytes)])
                 return
             except Exception as e:
