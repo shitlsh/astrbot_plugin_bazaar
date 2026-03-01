@@ -230,7 +230,8 @@ class BazaarPlugin(Star):
                 async with session.get(url, params=params, headers=FORGE_HEADERS) as resp:
                     if resp.status != 200:
                         return []
-                    return await resp.json()
+                    data = await resp.json()
+                    return data
             except Exception as e:
                 logger.debug(f"BazaarForge items 查询失败: {e}")
                 return []
@@ -241,40 +242,97 @@ class BazaarPlugin(Star):
         async def _fetch():
             session = await self._get_session()
             base_url = f"{FORGE_SUPABASE_URL}/rest/v1/builds"
+            select_fields = "id,title,hero,wins,max_health,victory_type,level,screenshot_url,created_at,item_ids"
+            fetch_limit = str(min(count + 5, 30))
 
-            hero_name = self._resolve_hero_name(search_term)
-            if hero_name:
+            tokens = search_term.split()
+            hero_name = None
+            item_tokens = []
+            for tok in tokens:
+                resolved = self._resolve_hero_name(tok)
+                if resolved and not hero_name:
+                    hero_name = resolved
+                else:
+                    item_tokens.append(tok)
+
+            if not hero_name:
+                hero_name = self._resolve_hero_name(search_term)
+                if hero_name:
+                    item_tokens = []
+
+            all_uuids = []
+            if item_tokens:
+                full_item = " ".join(item_tokens)
+                uuids = await self._forge_get_item_uuids(full_item)
+                if uuids:
+                    all_uuids.extend(uuids)
+                else:
+                    for tok in item_tokens:
+                        uuids = await self._forge_get_item_uuids(tok)
+                        if uuids:
+                            all_uuids.extend(uuids)
+            elif not hero_name:
+                all_uuids = await self._forge_get_item_uuids(search_term)
+
+            all_builds = []
+            seen_ids = set()
+
+            if hero_name and all_uuids:
+                for uuid in all_uuids[:5]:
+                    params = {
+                        "select": select_fields,
+                        "hero": f"eq.{hero_name}",
+                        "item_ids": f"cs.{{\"{uuid}\"}}",
+                        "order": "wins.desc",
+                        "limit": fetch_limit,
+                    }
+                    try:
+                        async with session.get(base_url, params=params, headers=FORGE_HEADERS) as resp:
+                            if resp.status == 200:
+                                for b in await resp.json():
+                                    if b["id"] not in seen_ids:
+                                        all_builds.append(b)
+                                        seen_ids.add(b["id"])
+                    except Exception as e:
+                        logger.debug(f"BazaarForge hero+item builds 查询失败: {e}")
+
+            if hero_name and not all_builds:
                 params = {
-                    "select": "id,title,hero,wins,max_health,victory_type,level,screenshot_url,created_at,item_ids",
+                    "select": select_fields,
                     "hero": f"eq.{hero_name}",
                     "order": "wins.desc",
-                    "limit": str(min(count + 5, 30)),
+                    "limit": fetch_limit,
                 }
                 try:
                     async with session.get(base_url, params=params, headers=FORGE_HEADERS) as resp:
                         if resp.status == 200:
                             data = await resp.json()
                             if data:
+                                if all_uuids:
+                                    uuid_set = set(all_uuids)
+                                    scored = []
+                                    for b in data:
+                                        bids = set(b.get("item_ids") or [])
+                                        overlap = len(bids & uuid_set)
+                                        scored.append((overlap, b))
+                                    scored.sort(key=lambda x: (-x[0], -(x[1].get("wins") or 0)))
+                                    return [b for _, b in scored]
                                 return data
                 except Exception as e:
                     logger.debug(f"BazaarForge hero builds 查询失败: {e}")
 
-            uuids = await self._forge_get_item_uuids(search_term)
-            all_builds = []
-
-            if uuids:
-                for uuid in uuids[:3]:
+            if all_uuids:
+                for uuid in all_uuids[:5]:
                     params = {
-                        "select": "id,title,hero,wins,max_health,victory_type,level,screenshot_url,created_at,item_ids",
+                        "select": select_fields,
                         "item_ids": f"cs.{{\"{uuid}\"}}",
                         "order": "wins.desc",
-                        "limit": str(min(count + 5, 30)),
+                        "limit": fetch_limit,
                     }
                     try:
                         async with session.get(base_url, params=params, headers=FORGE_HEADERS) as resp:
                             if resp.status == 200:
                                 data = await resp.json()
-                                seen_ids = {b["id"] for b in all_builds}
                                 for b in data:
                                     if b["id"] not in seen_ids:
                                         all_builds.append(b)
@@ -284,10 +342,10 @@ class BazaarPlugin(Star):
 
             if not all_builds:
                 params = {
-                    "select": "id,title,hero,wins,max_health,victory_type,level,screenshot_url,created_at,item_ids",
+                    "select": select_fields,
                     "title": f"ilike.*{search_term}*",
                     "order": "wins.desc",
-                    "limit": str(min(count + 5, 30)),
+                    "limit": fetch_limit,
                 }
                 try:
                     async with session.get(base_url, params=params, headers=FORGE_HEADERS) as resp:
