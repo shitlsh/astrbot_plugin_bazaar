@@ -1,3 +1,4 @@
+import asyncio
 import inspect
 import json
 import os
@@ -247,10 +248,19 @@ class BazaarPlugin(Star):
         items = await self._cached_request(f"forge_uuid:{search_term.lower()}", CACHE_TTL_ITEM_UUID, _fetch)
         return [it["id"] for it in items if it.get("id")]
 
+    async def _forge_query_builds(self, params: dict) -> list:
+        session = await self._get_session()
+        url = f"{FORGE_SUPABASE_URL}/rest/v1/builds"
+        try:
+            async with session.get(url, params=params, headers=FORGE_HEADERS) as resp:
+                if resp.status == 200:
+                    return await resp.json()
+        except Exception as e:
+            logger.debug(f"BazaarForge builds 查询失败: {e}")
+        return []
+
     async def _fetch_builds_forge(self, search_term: str, count: int) -> list:
         async def _fetch():
-            session = await self._get_session()
-            base_url = f"{FORGE_SUPABASE_URL}/rest/v1/builds"
             select_fields = "id,title,hero,wins,max_health,victory_type,level,screenshot_url,created_at,item_ids"
             fetch_limit = str(min(count + 5, 30))
 
@@ -276,92 +286,79 @@ class BazaarPlugin(Star):
                 if uuids:
                     all_uuids.extend(uuids)
                 else:
-                    for tok in item_tokens:
-                        uuids = await self._forge_get_item_uuids(tok)
-                        if uuids:
-                            all_uuids.extend(uuids)
+                    uuid_tasks = [self._forge_get_item_uuids(tok) for tok in item_tokens]
+                    results = await asyncio.gather(*uuid_tasks, return_exceptions=True)
+                    for r in results:
+                        if isinstance(r, list):
+                            all_uuids.extend(r)
             elif not hero_name:
                 all_uuids = await self._forge_get_item_uuids(search_term)
 
             all_builds = []
             seen_ids = set()
 
+            def _dedup_append(data):
+                for b in data:
+                    bid = b.get("id")
+                    if bid and bid not in seen_ids:
+                        all_builds.append(b)
+                        seen_ids.add(bid)
+
             if hero_name and all_uuids:
+                tasks = []
                 for uuid in all_uuids[:5]:
-                    params = {
+                    tasks.append(self._forge_query_builds({
                         "select": select_fields,
                         "hero": f"eq.{hero_name}",
                         "item_ids": f"cs.{{\"{uuid}\"}}",
                         "order": "wins.desc",
                         "limit": fetch_limit,
-                    }
-                    try:
-                        async with session.get(base_url, params=params, headers=FORGE_HEADERS) as resp:
-                            if resp.status == 200:
-                                for b in await resp.json():
-                                    if b["id"] not in seen_ids:
-                                        all_builds.append(b)
-                                        seen_ids.add(b["id"])
-                    except Exception as e:
-                        logger.debug(f"BazaarForge hero+item builds 查询失败: {e}")
+                    }))
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                for r in results:
+                    if isinstance(r, list):
+                        _dedup_append(r)
 
             if hero_name and not all_builds:
-                params = {
+                data = await self._forge_query_builds({
                     "select": select_fields,
                     "hero": f"eq.{hero_name}",
                     "order": "wins.desc",
                     "limit": fetch_limit,
-                }
-                try:
-                    async with session.get(base_url, params=params, headers=FORGE_HEADERS) as resp:
-                        if resp.status == 200:
-                            data = await resp.json()
-                            if data:
-                                if all_uuids:
-                                    uuid_set = set(all_uuids)
-                                    scored = []
-                                    for b in data:
-                                        bids = set(b.get("item_ids") or [])
-                                        overlap = len(bids & uuid_set)
-                                        scored.append((overlap, b))
-                                    scored.sort(key=lambda x: (-x[0], -(x[1].get("wins") or 0)))
-                                    return [b for _, b in scored]
-                                return data
-                except Exception as e:
-                    logger.debug(f"BazaarForge hero builds 查询失败: {e}")
+                })
+                if data:
+                    if all_uuids:
+                        uuid_set = set(all_uuids)
+                        scored = []
+                        for b in data:
+                            bids = set(b.get("item_ids") or [])
+                            overlap = len(bids & uuid_set)
+                            scored.append((overlap, b))
+                        scored.sort(key=lambda x: (-x[0], -(x[1].get("wins") or 0)))
+                        return [b for _, b in scored]
+                    return data
 
-            if all_uuids:
+            if all_uuids and not all_builds:
+                tasks = []
                 for uuid in all_uuids[:5]:
-                    params = {
+                    tasks.append(self._forge_query_builds({
                         "select": select_fields,
                         "item_ids": f"cs.{{\"{uuid}\"}}",
                         "order": "wins.desc",
                         "limit": fetch_limit,
-                    }
-                    try:
-                        async with session.get(base_url, params=params, headers=FORGE_HEADERS) as resp:
-                            if resp.status == 200:
-                                data = await resp.json()
-                                for b in data:
-                                    if b["id"] not in seen_ids:
-                                        all_builds.append(b)
-                                        seen_ids.add(b["id"])
-                    except Exception as e:
-                        logger.debug(f"BazaarForge item builds 查询失败: {e}")
+                    }))
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                for r in results:
+                    if isinstance(r, list):
+                        _dedup_append(r)
 
             if not all_builds:
-                params = {
+                all_builds = await self._forge_query_builds({
                     "select": select_fields,
                     "title": f"ilike.*{search_term}*",
                     "order": "wins.desc",
                     "limit": fetch_limit,
-                }
-                try:
-                    async with session.get(base_url, params=params, headers=FORGE_HEADERS) as resp:
-                        if resp.status == 200:
-                            all_builds = await resp.json()
-                except Exception as e:
-                    logger.debug(f"BazaarForge title builds 查询失败: {e}")
+                })
 
             return all_builds
         raw = await self._cached_request(f"forge_builds:{search_term.lower()}:{count}", CACHE_TTL_BUILDS, _fetch)
@@ -418,42 +415,48 @@ class BazaarPlugin(Star):
                         return []
                     posts = await resp.json()
 
-                builds = []
+                filtered = []
                 for post in posts:
-                    if len(builds) >= count:
+                    if len(filtered) >= count:
                         break
                     title = html_module.unescape(post.get("title", {}).get("rendered", ""))
                     if BUILD_FILTER_PATTERNS.search(title):
                         continue
                     if not BUILD_POSITIVE_PATTERN.search(title):
                         continue
+                    filtered.append(post)
+
+                async def _resolve_media(media_id):
+                    if not media_id:
+                        return ""
+                    media_url = f"{BUILDS_API}/media/{media_id}?_fields=source_url,media_details"
+                    try:
+                        async with session.get(media_url) as mresp:
+                            if mresp.status == 200:
+                                media = await mresp.json()
+                                sizes = media.get("media_details", {}).get("sizes", {})
+                                for size_key in ("large", "medium_large", "1536x1536", "medium"):
+                                    if size_key in sizes:
+                                        return sizes[size_key]["source_url"]
+                                return media.get("source_url", "")
+                    except Exception:
+                        pass
+                    return ""
+
+                media_tasks = [_resolve_media(p.get("featured_media", 0)) for p in filtered]
+                media_urls = await asyncio.gather(*media_tasks, return_exceptions=True)
+
+                builds = []
+                for post, img_url in zip(filtered, media_urls):
+                    title = html_module.unescape(post.get("title", {}).get("rendered", ""))
                     excerpt_raw = post.get("excerpt", {}).get("rendered", "")
                     excerpt_text = html_module.unescape(_strip_html(excerpt_raw))
-
-                    image_url = ""
-                    media_id = post.get("featured_media", 0)
-                    if media_id:
-                        media_url = f"{BUILDS_API}/media/{media_id}?_fields=source_url,media_details"
-                        try:
-                            async with session.get(media_url) as mresp:
-                                if mresp.status == 200:
-                                    media = await mresp.json()
-                                    sizes = media.get("media_details", {}).get("sizes", {})
-                                    for size_key in ("large", "medium_large", "1536x1536", "medium"):
-                                        if size_key in sizes:
-                                            image_url = sizes[size_key]["source_url"]
-                                            break
-                                    if not image_url:
-                                        image_url = media.get("source_url", "")
-                        except Exception:
-                            pass
-
                     builds.append({
                         "title": title,
                         "link": post.get("link", ""),
                         "date": post.get("date", "")[:10],
                         "excerpt": excerpt_text[:200],
-                        "image_url": image_url,
+                        "image_url": img_url if isinstance(img_url, str) else "",
                         "source": "wp",
                     })
                 return builds
@@ -473,20 +476,23 @@ class BazaarPlugin(Star):
         if priority == "forge_only":
             return await self._fetch_builds_forge(search_term, count)
 
+        forge_task = asyncio.create_task(self._fetch_builds_forge(search_term, count))
+        wp_task = asyncio.create_task(self._fetch_builds_wp(search_term, count))
+
         if priority == "wp_first":
-            primary = await self._fetch_builds_wp(search_term, count)
+            primary = await wp_task
             if len(primary) >= count:
+                forge_task.cancel()
                 return primary[:count]
-            remaining = count - len(primary)
-            secondary = await self._fetch_builds_forge(search_term, remaining)
-            return primary + secondary
+            secondary = await forge_task
+            return (primary + secondary)[:count]
         else:
-            primary = await self._fetch_builds_forge(search_term, count)
+            primary = await forge_task
             if len(primary) >= count:
+                wp_task.cancel()
                 return primary[:count]
-            remaining = count - len(primary)
-            secondary = await self._fetch_builds_wp(search_term, remaining)
-            return primary + secondary
+            secondary = await wp_task
+            return (primary + secondary)[:count]
 
     async def _fetch_tierlist(self, hero_en: str) -> list:
         async def _fetch():
@@ -2222,20 +2228,20 @@ class BazaarPlugin(Star):
             content=[Comp.Plain(header)]
         ))
 
-        for i, build in enumerate(builds, 1):
+        img_results = await asyncio.gather(*[
+            self._download_image(b["image_url"]) if b.get("image_url") else asyncio.sleep(0)
+            for b in builds
+        ], return_exceptions=True)
+
+        for i, (build, img_data) in enumerate(zip(builds, img_results), 1):
             caption = f"━━ {i}. {build['title']} ━━\n📅 {build['date']}"
             if build.get("source") == "forge" and build.get("excerpt"):
                 caption += f"\n📊 {build['excerpt']}"
             caption += f"\n🔗 {build['link']}"
             node_content = []
 
-            if build.get("image_url"):
-                try:
-                    img_bytes = await self._download_image(build["image_url"])
-                    if img_bytes:
-                        node_content.append(Comp.Image.fromBytes(img_bytes))
-                except Exception as e:
-                    logger.debug(f"阵容图片下载失败: {e}")
+            if isinstance(img_data, bytes) and img_data:
+                node_content.append(Comp.Image.fromBytes(img_data))
 
             if not node_content and build.get("excerpt") and build.get("source") != "forge":
                 caption += f"\n💬 {build['excerpt']}"
