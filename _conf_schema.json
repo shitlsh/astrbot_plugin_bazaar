@@ -66,5 +66,11 @@
     "type": "int",
     "hint": "使用 /tbznews 查询游戏更新公告时，未指定数量时默认获取的条数（1-20）。",
     "default": 1
+  },
+  "build_source_priority": {
+    "description": "阵容查询数据源优先级",
+    "type": "text",
+    "hint": "阵容查询的数据源优先级。可选值：forge_first（优先 BazaarForge，不足时补充 bazaar-builds.net）、wp_first（优先 bazaar-builds.net）、forge_only（仅 BazaarForge）、wp_only（仅 bazaar-builds.net）。",
+    "default": "forge_first"
   }
 }

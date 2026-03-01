@@ -1,5 +1,31 @@
 # Changelog
 
+## v1.1.1
+
+### Features
+
+- BazaarForge 阵容双数据源：新增 BazaarForge.gg（Supabase API）作为阵容查询数据源
+  - 默认优先从 BazaarForge 查询（结构化数据，含胜场/胜利类型/等级/血量），不足时自动补充 bazaar-builds.net
+  - 支持按物品名精确搜索（物品名→UUID→包含该物品的阵容）
+  - 支持按英雄名搜索（如 `/tbzbuild 海盗`）
+  - 阵容结果显示来源标识（BazaarForge / bazaar-builds.net）
+  - `_conf_schema.json` 新增 `build_source_priority` 配置项（forge_first / wp_first / forge_only / wp_only）
+- 新增 `/tbztier <英雄名>` 命令：查询英雄物品评级（Tier List）
+  - 从 BazaarForge 获取物品使用率数据，按 S/A/B/C 分级（S≥15%, A≥8%, B≥3%, C>0%）
+  - 渲染为精美图片卡片（彩色等级标识、使用率百分比、进度条、阵容数）
+  - 自动匹配中文物品名（与 BazaarHelper 数据关联）
+  - 支持中文英雄名和别名（如「海盗」→Vanessa）
+- 新增 `bazaar_query_tierlist` AI 工具：LLM 可自动查询英雄物品评级
+- API 响应缓存：新增 TTL 内存缓存层，减少重复 API 请求
+  - 阵容缓存 15 分钟、Tier List 缓存 30 分钟、Steam 新闻 30 分钟、物品 UUID 映射 60 分钟
+
+### Improvements
+
+- AI 人格预设增强：新增 tierlist 工具说明和触发场景，工具绑定增至 9 个
+- 阵容查询结果显示数据来源和结构化信息（胜场、胜利类型、等级、血量）
+- `/tbzhelp` 新增 `/tbztier` 命令说明，数据来源新增 BazaarForge
+- `bazaar_query_build` 工具描述更新，说明双数据源查询
+
 ## v1.1.0
 
 ### Features

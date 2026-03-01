@@ -15,7 +15,7 @@
 ```
 ├── main.py                # 插件主代码（指令处理器）
 ├── card_renderer.py       # 图片卡片渲染器（Pillow生成PNG卡片）
-├── _conf_schema.json      # AstrBot 插件配置 Schema（别名配置、默认数量）
+├── _conf_schema.json      # AstrBot 插件配置 Schema（别名配置、默认数量、数据源优先级）
 ├── metadata.yaml          # 插件元数据
 ├── requirements.txt       # 依赖 (Pillow, aiohttp)
 ├── README.md              # 项目说明
@@ -42,12 +42,13 @@
 - `/tbzevent <名称>` - 查询事件详情（选项及描述，含适用英雄和品质）
 - `/tbzsearch <条件>` - 多条件搜索（支持 tag:/tier:/hero:/size: 前缀组合，合并转发输出，含事件结果，事件支持按英雄过滤）
 - `/tbznews [数量]` - 查询游戏官方更新公告（Steam 中文翻译，图片卡片输出）
-- `/tbzbuild <物品名> [数量]` - 查询推荐阵容（默认5条，最多10条，合并转发输出）
+- `/tbzbuild <物品名> [数量]` - 查询推荐阵容（默认5条，最多10条，双数据源，合并转发输出）
+- `/tbztier <英雄名>` - 查询英雄物品评级 Tier List（图片卡片输出，S/A/B/C 分级）
 - `/tbzalias` - 别名管理（list/add/del）
 - `/tbzupdate` - 从 BazaarHelper 仓库更新游戏数据
 
 ## AI 工具 (@llm_tool)
-- 8 个 `@filter.llm_tool` 注册到 AstrBot LLM 工具链，AI 对话中自动调用：
+- 9 个 `@filter.llm_tool` 注册到 AstrBot LLM 工具链，AI 对话中自动调用：
   - `bazaar_query_item` — 查询物品详情（参数: item_name）
   - `bazaar_query_monster` — 查询怪物详情（参数: monster_name）
   - `bazaar_query_skill` — 查询技能详情（参数: skill_name）
@@ -55,6 +56,7 @@
   - `bazaar_search` — 多条件搜索（参数: query）
   - `bazaar_query_build` — 查询推荐阵容（参数: query, count）
   - `bazaar_get_news` — 查询游戏更新公告（参数: count）
+  - `bazaar_query_tierlist` — 查询英雄物品评级（参数: hero_name）
 - 工具返回纯文本格式（非图片），供 AI 整合到回复中
 - 需要 AstrBot 配置支持函数调用的 LLM 模型才能使用 AI 工具
 
@@ -62,8 +64,28 @@
 - `_register_persona()` 在 `initialize()` 中调用，通过 `self.context.persona_manager` 注册
 - persona_id: `bazaar_helper`，包含游戏背景、英雄列表、工具使用规则的系统提示词
 - begin_dialogs: 2 条开场对话（user/assistant 交替）
-- tools: 绑定 8 个 bazaar_* 工具（含 bazaar_get_news），确保人格模式下优先调用
+- tools: 绑定 9 个 bazaar_* 工具（含 bazaar_query_tierlist），确保人格模式下优先调用
 - 幂等注册：已存在则 update_persona，不存在则 create_persona
+
+## 数据源架构
+### BazaarHelper（游戏数据主源，中英文）
+- 物品/怪物/技能/事件的完整中英文数据
+- 不可替代：BazaarForge 全英文无中文翻译
+
+### BazaarForge（阵容+评级，英文）
+- Supabase API: `https://cwlgghqlqvpbmfuvkvle.supabase.co`
+- 用于：阵容搜索（按物品UUID/英雄/标题）、物品评级（hero_stats字段）
+- 物品名→UUID 查找 → builds 表按 item_ids 过滤
+- Tier List: items 表 hero_stats->>HeroName 降序排列
+
+### bazaar-builds.net（阵容补充源）
+- WordPress REST API
+- 作为 BazaarForge 的回退/补充数据源
+
+## API 缓存
+- `_cached_request(key, ttl, fetch_fn)` 通用 TTL 内存缓存
+- 阵容: 15分钟、Tier List: 30分钟、Steam新闻: 30分钟、物品UUID映射: 60分钟
+- 纯内存，不落盘
 
 ## 事件数据增强
 - `_enrich_events()` 在 `_load_data()` 末尾调用
@@ -81,7 +103,7 @@
 ## 别名与配置系统
 - 使用 AstrBot 的 `_conf_schema.json` 配置体系，别名可通过 AstrBot 管理面板直接编辑
 - 配置项: `hero_aliases`, `item_aliases`, `monster_aliases`, `skill_aliases`, `tag_aliases`, `tier_aliases`, `size_aliases`（均为 dict 类型）
-- `build_default_count`（默认5）, `news_default_count`（默认1）
+- `build_default_count`（默认5）, `news_default_count`（默认1）, `build_source_priority`（默认forge_first）
 - 向下兼容：无 config 时回退到 `data/aliases.json` 文件读写
 
 ## 图片卡片渲染
@@ -91,6 +113,7 @@
 - 品质（Bronze/Silver/Gold/Diamond）使用对应颜色高亮
 - 物品卡片包含：技能、属性、数值(含tier成长)、附魔、任务
 - 新闻卡片：标题+日期+BBCode正文+Steam链接
+- Tier List 卡片：S/A/B/C 彩色分级、使用率百分比、进度条、阵容数
 - 渲染失败时自动回退到纯文本输出
 - 需要中文字体支持（WenQuanYi Zen Hei）
 
@@ -102,5 +125,5 @@
 ## 技术栈
 - Python 3.11
 - Pillow (图片生成)
-- aiohttp (异步HTTP，用于获取游戏图片、阵容API、Steam新闻API)
+- aiohttp (异步HTTP，用于获取游戏图片、BazaarForge API、阵容API、Steam新闻API)
 - AstrBot 插件框架

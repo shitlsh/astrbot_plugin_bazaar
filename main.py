@@ -2,6 +2,7 @@ import inspect
 import json
 import os
 import re
+import time
 import html as html_module
 from datetime import datetime
 from pathlib import Path
@@ -15,6 +16,39 @@ import astrbot.api.message_components as Comp
 
 BUILDS_API = "https://bazaar-builds.net/wp-json/wp/v2"
 DEFAULT_BUILD_COUNT = 5
+
+FORGE_SUPABASE_URL = "https://cwlgghqlqvpbmfuvkvle.supabase.co"
+FORGE_ANON_KEY = (
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+    "eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3bGdnaHFscXZwYm1mdXZrdmxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwODIzNDYsImV4cCI6MjA3OTY1ODM0Nn0."
+    "fuVBdRQ1rMPerBGnlS08FLOvZKSlICwtJq1WKEj7YA8"
+)
+FORGE_HEADERS = {
+    "apikey": FORGE_ANON_KEY,
+    "Authorization": f"Bearer {FORGE_ANON_KEY}",
+}
+FORGE_BUILD_URL = "https://bazaarforge.gg/builds"
+
+CACHE_TTL_BUILDS = 900
+CACHE_TTL_TIERLIST = 1800
+CACHE_TTL_NEWS = 1800
+CACHE_TTL_ITEM_UUID = 3600
+
+TIER_LIST_THRESHOLDS = {"S": 15.0, "A": 8.0, "B": 3.0, "C": 0.0}
+
+HERO_EN_MAP = {
+    "杜利": "Dooley", "朱尔斯": "Jules", "马克": "Mak",
+    "皮格马利翁": "Pygmalien", "斯黛拉": "Stelle", "瓦妮莎": "Vanessa",
+    "猪猪": "Pygmalien", "猪": "Pygmalien", "猪哥": "Pygmalien",
+    "鸡煲": "Dooley", "机宝": "Dooley", "海盗": "Vanessa",
+    "海盗姐": "Vanessa", "黑妹": "Stelle", "厨子": "Jules",
+    "大厨": "Jules", "厨师": "Jules",
+}
+
+VICTORY_TYPE_CN = {
+    "Health": "血量胜", "Kill": "击杀胜", "Income": "收入胜",
+    "Level": "等级胜", "Time": "时间胜",
+}
 
 BUILD_FILTER_PATTERNS = re.compile(
     r'(?i)\b(?:patch|hotfix|update|changelog|maintenance|downtime|release\s*note|dev\s*blog|news|new\s*feature|announcement|preview|season\s*\d|guide|tutorial|tier\s*list|ranking)\b'
@@ -148,7 +182,7 @@ CONFIG_KEY_MAP = {
 }
 
 
-@register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、事件、阵容、更新公告查询，图片卡片展示，AI 人格预设与工具自动调用", "v1.1.0")
+@register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、事件、阵容、更新公告、物品评级查询，图片卡片展示，AI 人格预设与工具自动调用", "v1.1.1")
 class BazaarPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
@@ -162,11 +196,285 @@ class BazaarPlugin(Star):
         self.plugin_dir = Path(os.path.dirname(os.path.abspath(__file__)))
         self.renderer = None
         self._session: aiohttp.ClientSession | None = None
+        self._cache: dict[str, tuple[float, any]] = {}
 
     async def _get_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
             self._session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20))
         return self._session
+
+    async def _cached_request(self, key: str, ttl: int, fetch_fn):
+        now = time.time()
+        entry = self._cache.get(key)
+        if entry and (now - entry[0]) < ttl:
+            return entry[1]
+        data = await fetch_fn()
+        if data:
+            self._cache[key] = (now, data)
+        return data
+
+    def _resolve_hero_name(self, query: str) -> str | None:
+        ql = query.strip().lower()
+        hero_map = {**{k.lower(): v for k, v in HERO_EN_MAP.items()},
+                    **{v.lower(): v for v in HERO_EN_MAP.values()}}
+        for alias, target in self.aliases.get("hero", {}).items():
+            hero_map[alias.lower()] = target
+        return hero_map.get(ql)
+
+    async def _forge_get_item_uuids(self, search_term: str) -> list[str]:
+        async def _fetch():
+            session = await self._get_session()
+            url = f"{FORGE_SUPABASE_URL}/rest/v1/items"
+            params = {"select": "id,name", "name": f"ilike.*{search_term}*", "limit": "10"}
+            try:
+                async with session.get(url, params=params, headers=FORGE_HEADERS) as resp:
+                    if resp.status != 200:
+                        return []
+                    return await resp.json()
+            except Exception as e:
+                logger.debug(f"BazaarForge items 查询失败: {e}")
+                return []
+        items = await self._cached_request(f"forge_uuid:{search_term.lower()}", CACHE_TTL_ITEM_UUID, _fetch)
+        return [it["id"] for it in items if it.get("id")]
+
+    async def _fetch_builds_forge(self, search_term: str, count: int) -> list:
+        async def _fetch():
+            session = await self._get_session()
+            base_url = f"{FORGE_SUPABASE_URL}/rest/v1/builds"
+
+            hero_name = self._resolve_hero_name(search_term)
+            if hero_name:
+                params = {
+                    "select": "id,title,hero,wins,max_health,victory_type,level,screenshot_url,created_at,item_ids",
+                    "hero": f"eq.{hero_name}",
+                    "order": "wins.desc",
+                    "limit": str(min(count + 5, 30)),
+                }
+                try:
+                    async with session.get(base_url, params=params, headers=FORGE_HEADERS) as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            if data:
+                                return data
+                except Exception as e:
+                    logger.debug(f"BazaarForge hero builds 查询失败: {e}")
+
+            uuids = await self._forge_get_item_uuids(search_term)
+            all_builds = []
+
+            if uuids:
+                for uuid in uuids[:3]:
+                    params = {
+                        "select": "id,title,hero,wins,max_health,victory_type,level,screenshot_url,created_at,item_ids",
+                        "item_ids": f"cs.{{\"{uuid}\"}}",
+                        "order": "wins.desc",
+                        "limit": str(min(count + 5, 30)),
+                    }
+                    try:
+                        async with session.get(base_url, params=params, headers=FORGE_HEADERS) as resp:
+                            if resp.status == 200:
+                                data = await resp.json()
+                                seen_ids = {b["id"] for b in all_builds}
+                                for b in data:
+                                    if b["id"] not in seen_ids:
+                                        all_builds.append(b)
+                                        seen_ids.add(b["id"])
+                    except Exception as e:
+                        logger.debug(f"BazaarForge item builds 查询失败: {e}")
+
+            if not all_builds:
+                params = {
+                    "select": "id,title,hero,wins,max_health,victory_type,level,screenshot_url,created_at,item_ids",
+                    "title": f"ilike.*{search_term}*",
+                    "order": "wins.desc",
+                    "limit": str(min(count + 5, 30)),
+                }
+                try:
+                    async with session.get(base_url, params=params, headers=FORGE_HEADERS) as resp:
+                        if resp.status == 200:
+                            all_builds = await resp.json()
+                except Exception as e:
+                    logger.debug(f"BazaarForge title builds 查询失败: {e}")
+
+            return all_builds
+        raw = await self._cached_request(f"forge_builds:{search_term.lower()}:{count}", CACHE_TTL_BUILDS, _fetch)
+        builds = []
+        for b in raw[:count]:
+            victory = b.get("victory_type", "")
+            victory_cn = VICTORY_TYPE_CN.get(victory, victory)
+            date_str = (b.get("created_at") or "")[:10]
+            wins = b.get("wins", 0)
+            level = b.get("level", 0)
+            max_hp = b.get("max_health", 0)
+            hero = b.get("hero", "")
+            hero_cn = HERO_CN_MAP.get(hero, hero)
+
+            excerpt_parts = []
+            if hero:
+                excerpt_parts.append(f"{hero_cn}({hero})")
+            if wins:
+                excerpt_parts.append(f"{wins}胜")
+            if victory_cn:
+                excerpt_parts.append(victory_cn)
+            if level:
+                excerpt_parts.append(f"Lv.{level}")
+            if max_hp:
+                excerpt_parts.append(f"HP:{max_hp}")
+
+            builds.append({
+                "title": b.get("title", f"{hero} Build"),
+                "link": f"{FORGE_BUILD_URL}/{b.get('id', '')}",
+                "date": date_str,
+                "excerpt": " | ".join(excerpt_parts),
+                "image_url": b.get("screenshot_url", ""),
+                "source": "forge",
+                "wins": wins,
+                "victory_type": victory_cn,
+                "level": level,
+                "max_health": max_hp,
+                "hero": hero,
+            })
+        return builds
+
+    async def _fetch_builds_wp(self, search_term: str, count: int) -> list:
+        async def _fetch():
+            url = f"{BUILDS_API}/posts"
+            params = {
+                "search": search_term,
+                "per_page": min(count + 5, 20),
+                "_fields": "id,title,link,date,excerpt,featured_media",
+            }
+            try:
+                session = await self._get_session()
+                async with session.get(url, params=params) as resp:
+                    if resp.status != 200:
+                        return []
+                    posts = await resp.json()
+
+                builds = []
+                for post in posts:
+                    if len(builds) >= count:
+                        break
+                    title = html_module.unescape(post.get("title", {}).get("rendered", ""))
+                    if BUILD_FILTER_PATTERNS.search(title):
+                        continue
+                    if not BUILD_POSITIVE_PATTERN.search(title):
+                        continue
+                    excerpt_raw = post.get("excerpt", {}).get("rendered", "")
+                    excerpt_text = html_module.unescape(_strip_html(excerpt_raw))
+
+                    image_url = ""
+                    media_id = post.get("featured_media", 0)
+                    if media_id:
+                        media_url = f"{BUILDS_API}/media/{media_id}?_fields=source_url,media_details"
+                        try:
+                            async with session.get(media_url) as mresp:
+                                if mresp.status == 200:
+                                    media = await mresp.json()
+                                    sizes = media.get("media_details", {}).get("sizes", {})
+                                    for size_key in ("large", "medium_large", "1536x1536", "medium"):
+                                        if size_key in sizes:
+                                            image_url = sizes[size_key]["source_url"]
+                                            break
+                                    if not image_url:
+                                        image_url = media.get("source_url", "")
+                        except Exception:
+                            pass
+
+                    builds.append({
+                        "title": title,
+                        "link": post.get("link", ""),
+                        "date": post.get("date", "")[:10],
+                        "excerpt": excerpt_text[:200],
+                        "image_url": image_url,
+                        "source": "wp",
+                    })
+                return builds
+            except Exception as e:
+                logger.warning(f"查询阵容失败 (bazaar-builds.net): {e}")
+                return []
+        return await self._cached_request(f"wp_builds:{search_term.lower()}:{count}", CACHE_TTL_BUILDS, _fetch)
+
+    async def _fetch_builds_combined(self, search_term: str, count: int) -> list:
+        if self.config:
+            priority = self.config.get("build_source_priority", "forge_first")
+        else:
+            priority = "forge_first"
+
+        if priority == "wp_only":
+            return await self._fetch_builds_wp(search_term, count)
+        if priority == "forge_only":
+            return await self._fetch_builds_forge(search_term, count)
+
+        if priority == "wp_first":
+            primary = await self._fetch_builds_wp(search_term, count)
+            if len(primary) >= count:
+                return primary[:count]
+            remaining = count - len(primary)
+            secondary = await self._fetch_builds_forge(search_term, remaining)
+            return primary + secondary
+        else:
+            primary = await self._fetch_builds_forge(search_term, count)
+            if len(primary) >= count:
+                return primary[:count]
+            remaining = count - len(primary)
+            secondary = await self._fetch_builds_wp(search_term, remaining)
+            return primary + secondary
+
+    async def _fetch_tierlist(self, hero_en: str) -> list:
+        async def _fetch():
+            session = await self._get_session()
+            url = f"{FORGE_SUPABASE_URL}/rest/v1/items"
+            params = {
+                "select": "id,name,build_count,hero_stats,starting_tier,size,tags,image_url",
+                f"hero_stats->>{hero_en}": "gt.0",
+                "order": f"hero_stats->>{hero_en}.desc",
+                "limit": "60",
+            }
+            try:
+                async with session.get(url, params=params, headers=FORGE_HEADERS) as resp:
+                    if resp.status != 200:
+                        logger.warning(f"BazaarForge tierlist 查询失败: HTTP {resp.status}")
+                        return []
+                    return await resp.json()
+            except Exception as e:
+                logger.warning(f"BazaarForge tierlist 查询失败: {e}")
+                return []
+        raw = await self._cached_request(f"tierlist:{hero_en}", CACHE_TTL_TIERLIST, _fetch)
+
+        tier_items = {"S": [], "A": [], "B": [], "C": []}
+        for item in raw:
+            hero_stats = item.get("hero_stats", {})
+            pct = float(hero_stats.get(hero_en, 0))
+            if pct <= 0:
+                continue
+            cn_name = ""
+            for local_item in self.items:
+                if local_item.get("name_en", "").lower() == item.get("name", "").lower():
+                    cn_name = local_item.get("name_cn", "")
+                    break
+            entry = {
+                "name": item.get("name", ""),
+                "name_cn": cn_name,
+                "pct": pct,
+                "build_count": item.get("build_count", 0),
+                "tier": item.get("starting_tier", ""),
+                "size": item.get("size", ""),
+                "tags": item.get("tags", []),
+            }
+            if pct >= TIER_LIST_THRESHOLDS["S"]:
+                tier_items["S"].append(entry)
+            elif pct >= TIER_LIST_THRESHOLDS["A"]:
+                tier_items["A"].append(entry)
+            elif pct >= TIER_LIST_THRESHOLDS["B"]:
+                tier_items["B"].append(entry)
+            else:
+                tier_items["C"].append(entry)
+
+        for grade in tier_items:
+            tier_items[grade].sort(key=lambda x: x["pct"], reverse=True)
+
+        return tier_items
 
     def _parse_alias_value(self, val) -> dict:
         if isinstance(val, dict):
@@ -293,14 +601,16 @@ class BazaarPlugin(Star):
             "- bazaar_query_skill: 查询技能详情（描述、适用英雄等）\n"
             "- bazaar_query_event: 查询事件选项和奖励\n"
             "- bazaar_search: 多条件搜索物品/怪物/技能/事件\n"
-            "- bazaar_query_build: 查询社区推荐阵容\n"
-            "- bazaar_get_news: 查询游戏最近的更新公告/补丁说明\n\n"
+            "- bazaar_query_build: 查询社区推荐阵容（来自 BazaarForge 和 bazaar-builds.net）\n"
+            "- bazaar_get_news: 查询游戏最近的更新公告/补丁说明\n"
+            "- bazaar_query_tierlist: 查询英雄物品评级（Tier List，各物品使用率排名）\n\n"
             "重要规则：\n"
             "- 当用户提到任何可能是游戏内容的名词时（如物品名、怪物名、英雄名），优先使用工具查询，不要凭空编造信息\n"
             "- 当用户问「怎么搭配」「怎么玩」「推荐阵容」时，使用 bazaar_query_build 工具\n"
             "- 当用户问某个东西「是什么」「有什么效果」时，先用 bazaar_query_item 查询\n"
             "- 当用户问「最近更新了什么」「有什么新补丁」「更新公告」时，使用 bazaar_get_news 工具\n"
-            "- 工具返回的是纯文本信息。如果用户想看图片卡片，建议他们使用 /tbzitem、/tbzmonster、/tbzskill 等命令\n"
+            "- 当用户问「哪些物品好用」「物品推荐」「装备排名」「tier list」时，使用 bazaar_query_tierlist 工具\n"
+            "- 工具返回的是纯文本信息。如果用户想看图片卡片，建议他们使用 /tbzitem、/tbzmonster、/tbzskill、/tbztier 等命令\n"
             "- 在回复中整合工具返回的数据，并在末尾告知用户可以使用对应命令查看图片版本\n"
             "- 用中文回复玩家，语气友好专业\n"
             "- 游戏中的英雄包括：Dooley(杜利/鸡煲)、Jules(朱尔斯/厨子)、Mak(马克)、Pygmalien(皮格马利翁/猪猪)、Stelle(斯黛拉/黑妹)、Vanessa(瓦妮莎/海盗) 等\n"
@@ -319,6 +629,7 @@ class BazaarPlugin(Star):
             "bazaar_search",
             "bazaar_query_build",
             "bazaar_get_news",
+            "bazaar_query_tierlist",
         ]
         try:
             pm = self.context.persona_manager
@@ -959,6 +1270,8 @@ class BazaarPlugin(Star):
             "  示例: /tbznews 或 /tbznews 3\n\n"
             "/tbzbuild <物品名> [数量] - 查询推荐阵容\n"
             "  示例: /tbzbuild 符文匕首\n\n"
+            "/tbztier <英雄名> - 查询英雄物品评级(Tier List)\n"
+            "  示例: /tbztier 海盗 或 /tbztier Vanessa\n\n"
             "/tbzalias - 别名管理(查看/添加/删除)\n"
             "  查看: /tbzalias list [分类]\n"
             "  添加: /tbzalias add hero 猪猪 Pygmalien\n"
@@ -966,7 +1279,7 @@ class BazaarPlugin(Star):
             "/tbzupdate - 从远端更新游戏数据\n\n"
             "/tbzhelp - 显示此帮助信息\n"
             "━━━━━━━━━━━━━━━━━━\n"
-            "数据来源: BazaarHelper | bazaar-builds.net | Steam\n\n"
+            "数据来源: BazaarHelper | BazaarForge | bazaar-builds.net | Steam\n\n"
             "💡 AI 工具: 本插件支持 AI 自动调用，需要 AstrBot 配置支持函数调用的 LLM 模型"
         )
         yield event.plain_result(help_text)
@@ -1604,104 +1917,48 @@ class BazaarPlugin(Star):
             logger.debug(f"图片下载失败: {url}: {e}")
         return None
 
-    async def _fetch_builds(self, search_term: str, count: int) -> list:
-        url = f"{BUILDS_API}/posts"
-        params = {
-            "search": search_term,
-            "per_page": min(count + 5, 20),
-            "_fields": "id,title,link,date,excerpt,featured_media",
-        }
-        try:
-            session = await self._get_session()
-            async with session.get(url, params=params) as resp:
-                if resp.status != 200:
-                    return []
-                posts = await resp.json()
-
-            builds = []
-            for post in posts:
-                if len(builds) >= count:
-                    break
-                title = html_module.unescape(post.get("title", {}).get("rendered", ""))
-                if BUILD_FILTER_PATTERNS.search(title):
-                    logger.debug(f"阵容查询过滤非阵容内容(黑名单): {title}")
-                    continue
-                if not BUILD_POSITIVE_PATTERN.search(title):
-                    logger.debug(f"阵容查询过滤非阵容内容(无阵容特征): {title}")
-                    continue
-                excerpt_raw = post.get("excerpt", {}).get("rendered", "")
-                excerpt_text = html_module.unescape(_strip_html(excerpt_raw))
-
-                image_url = ""
-                media_id = post.get("featured_media", 0)
-                if media_id:
-                    media_url = f"{BUILDS_API}/media/{media_id}?_fields=source_url,media_details"
-                    try:
-                        async with session.get(media_url) as mresp:
-                            if mresp.status == 200:
-                                media = await mresp.json()
-                                sizes = media.get("media_details", {}).get("sizes", {})
-                                for size_key in ("large", "medium_large", "1536x1536", "medium"):
-                                    if size_key in sizes:
-                                        image_url = sizes[size_key]["source_url"]
-                                        break
-                                if not image_url:
-                                    image_url = media.get("source_url", "")
-                    except Exception:
-                        pass
-
-                builds.append({
-                    "title": title,
-                    "link": post.get("link", ""),
-                    "date": post.get("date", "")[:10],
-                    "excerpt": excerpt_text[:200],
-                    "image_url": image_url,
-                })
-            return builds
-        except Exception as e:
-            logger.warning(f"查询阵容失败: {e}")
-            return []
-
     async def _fetch_news(self, count: int = 1) -> list:
-        session = await self._get_session()
-        params = {
-            "clan_accountid": 0,
-            "appid": STEAM_APP_ID,
-            "offset": 0,
-            "count": count,
-            "l": "schinese",
-        }
-        try:
-            async with session.get(STEAM_NEWS_API, params=params, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                if resp.status != 200:
-                    logger.warning(f"Steam 新闻 API 返回 HTTP {resp.status}")
-                    return []
-                data = await resp.json(content_type=None)
-        except Exception as e:
-            logger.warning(f"获取 Steam 新闻失败: {e}")
-            return []
+        async def _fetch():
+            session = await self._get_session()
+            params = {
+                "clan_accountid": 0,
+                "appid": STEAM_APP_ID,
+                "offset": 0,
+                "count": count,
+                "l": "schinese",
+            }
+            try:
+                async with session.get(STEAM_NEWS_API, params=params, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                    if resp.status != 200:
+                        logger.warning(f"Steam 新闻 API 返回 HTTP {resp.status}")
+                        return []
+                    data = await resp.json(content_type=None)
+            except Exception as e:
+                logger.warning(f"获取 Steam 新闻失败: {e}")
+                return []
 
-        events_list = data.get("events", [])
-        articles = []
-        for ev_data in events_list:
-            gid = ev_data.get("gid", "")
-            title = ev_data.get("event_name", "")
-            announcement = ev_data.get("announcement_body", {})
-            if not title:
-                title = announcement.get("headline", "")
-            body_bbcode = announcement.get("body", "")
-            body_text = _strip_bbcode(body_bbcode)
-            post_time = ev_data.get("rtime32_start_time", 0)
-            date_str = datetime.utcfromtimestamp(post_time).strftime("%Y-%m-%d") if post_time else ""
-            url = f"https://store.steampowered.com/news/app/{STEAM_APP_ID}/view/{gid}?l=schinese"
-            articles.append({
-                "title": title,
-                "date": date_str,
-                "body": body_text,
-                "url": url,
-                "gid": gid,
-            })
-        return articles
+            events_list = data.get("events", [])
+            articles = []
+            for ev_data in events_list:
+                gid = ev_data.get("gid", "")
+                title = ev_data.get("event_name", "")
+                announcement = ev_data.get("announcement_body", {})
+                if not title:
+                    title = announcement.get("headline", "")
+                body_bbcode = announcement.get("body", "")
+                body_text = _strip_bbcode(body_bbcode)
+                post_time = ev_data.get("rtime32_start_time", 0)
+                date_str = datetime.utcfromtimestamp(post_time).strftime("%Y-%m-%d") if post_time else ""
+                url = f"https://store.steampowered.com/news/app/{STEAM_APP_ID}/view/{gid}?l=schinese"
+                articles.append({
+                    "title": title,
+                    "date": date_str,
+                    "body": body_text,
+                    "url": url,
+                    "gid": gid,
+                })
+            return articles
+        return await self._cached_request(f"news:{count}", CACHE_TTL_NEWS, _fetch)
 
     @filter.command("tbznews")
     async def cmd_news(self, event: AstrMessageEvent):
@@ -1803,7 +2060,7 @@ class BazaarPlugin(Star):
 
         search_term, display = self._translate_build_query(query)
 
-        builds = await self._fetch_builds(search_term, count)
+        builds = await self._fetch_builds_combined(search_term, count)
 
         if not builds:
             hint = f"\n📋 识别: {display}" if display != query else ""
@@ -1815,11 +2072,22 @@ class BazaarPlugin(Star):
             )
             return
 
+        forge_count = sum(1 for b in builds if b.get("source") == "forge")
+        wp_count = sum(1 for b in builds if b.get("source") == "wp")
+        source_parts = []
+        if forge_count:
+            source_parts.append(f"BazaarForge:{forge_count}")
+        if wp_count:
+            source_parts.append(f"bazaar-builds:{wp_count}")
+        source_hint = " | ".join(source_parts)
+
         header = f"🏗️ 「{query}」推荐阵容 (共{len(builds)}条)"
         if search_term != query:
             header += f"\n🔍 搜索: {search_term}"
         if display != query and display != search_term:
             header += f"\n📋 识别: {display}"
+        if source_hint:
+            header += f"\n📊 来源: {source_hint}"
 
         nodes = []
         nodes.append(Comp.Node(
@@ -1829,7 +2097,10 @@ class BazaarPlugin(Star):
         ))
 
         for i, build in enumerate(builds, 1):
-            caption = f"━━ {i}. {build['title']} ━━\n📅 {build['date']}\n🔗 {build['link']}"
+            caption = f"━━ {i}. {build['title']} ━━\n📅 {build['date']}"
+            if build.get("source") == "forge" and build.get("excerpt"):
+                caption += f"\n📊 {build['excerpt']}"
+            caption += f"\n🔗 {build['link']}"
             node_content = []
 
             if build.get("image_url"):
@@ -1840,7 +2111,7 @@ class BazaarPlugin(Star):
                 except Exception as e:
                     logger.debug(f"阵容图片下载失败: {e}")
 
-            if not node_content and build.get("excerpt"):
+            if not node_content and build.get("excerpt") and build.get("source") != "forge":
                 caption += f"\n💬 {build['excerpt']}"
 
             node_content.append(Comp.Plain(caption))
@@ -1854,7 +2125,7 @@ class BazaarPlugin(Star):
         nodes.append(Comp.Node(
             name="大巴扎小助手",
             uin="0",
-            content=[Comp.Plain(f"💡 更多阵容: {more_url}")]
+            content=[Comp.Plain(f"💡 更多阵容: {more_url}\n💡 BazaarForge: {FORGE_BUILD_URL}")]
         ))
 
         try:
@@ -2090,7 +2361,7 @@ class BazaarPlugin(Star):
 
     @filter.llm_tool(name="bazaar_query_build")
     async def tool_query_build(self, event: AstrMessageEvent, query: str, count: int = 5):
-        '''查询 The Bazaar 游戏的社区推荐阵容。根据物品名、英雄名等关键词从 bazaar-builds.net 搜索玩家分享的通关阵容。当用户询问某个物品的阵容搭配、某个英雄怎么玩、推荐阵容时使用此工具。
+        '''查询 The Bazaar 游戏的社区推荐阵容。根据物品名、英雄名等关键词从 BazaarForge 和 bazaar-builds.net 搜索玩家分享的通关阵容。当用户询问某个物品的阵容搭配、某个英雄怎么玩、推荐阵容时使用此工具。
 
         Args:
             query(string): 搜索关键词，可以是物品名、英雄名或组合。支持中文，会自动翻译为英文搜索。例如：符文匕首、海盗船锚、Vanessa Anchor
@@ -2098,7 +2369,7 @@ class BazaarPlugin(Star):
         '''
         count = max(1, min(count, 10))
         search_term, display = self._translate_build_query(query)
-        builds = await self._fetch_builds(search_term, count)
+        builds = await self._fetch_builds_combined(search_term, count)
 
         if not builds:
             yield event.plain_result(
@@ -2114,14 +2385,117 @@ class BazaarPlugin(Star):
         for i, build in enumerate(builds, 1):
             lines.append(f"{i}. {build['title']}")
             lines.append(f"   日期: {build['date']}")
+            if build.get("source") == "forge" and build.get("excerpt"):
+                lines.append(f"   数据: {build['excerpt']}")
             lines.append(f"   链接: {build['link']}")
-            if build.get("excerpt"):
+            if build.get("source") == "wp" and build.get("excerpt"):
                 lines.append(f"   简介: {build['excerpt'][:100]}")
             lines.append("")
 
-        more_url = f"https://bazaar-builds.net/?s={search_term.replace(' ', '+')}"
-        lines.append(f"更多阵容: {more_url}")
+        lines.append(f"更多阵容: https://bazaar-builds.net/?s={search_term.replace(' ', '+')} 或 {FORGE_BUILD_URL}")
 
+        yield event.plain_result("\n".join(lines))
+
+    @filter.command("tbztier")
+    async def cmd_tier(self, event: AstrMessageEvent):
+        """查询英雄物品 Tier List"""
+        query = _extract_query(event.message_str, "tbztier")
+        if not query:
+            yield event.plain_result(
+                "请输入英雄名称查询物品评级，例如:\n"
+                "  /tbztier 海盗\n"
+                "  /tbztier Vanessa\n"
+                "  /tbztier 杜利\n\n"
+                "可用英雄: Dooley(杜利) | Jules(朱尔斯) | Mak(马克) | Pygmalien(皮格马利翁) | Stelle(斯黛拉) | Vanessa(瓦妮莎)"
+            )
+            return
+
+        query = self._resolve_alias(query)
+        hero_en = self._resolve_hero_name(query)
+        if not hero_en:
+            hero_en = query.strip().capitalize()
+            valid_heroes = ["Dooley", "Jules", "Mak", "Pygmalien", "Stelle", "Vanessa"]
+            if hero_en not in valid_heroes:
+                yield event.plain_result(
+                    f"未识别英雄「{query}」。\n\n"
+                    "可用英雄: Dooley(杜利) | Jules(朱尔斯) | Mak(马克) | Pygmalien(皮格马利翁) | Stelle(斯黛拉) | Vanessa(瓦妮莎)"
+                )
+                return
+
+        hero_cn = HERO_CN_MAP.get(hero_en, hero_en)
+        yield event.plain_result(f"⏳ 正在从 BazaarForge 获取 {hero_cn}({hero_en}) 物品评级...")
+
+        tier_items = await self._fetch_tierlist(hero_en)
+
+        total = sum(len(v) for v in tier_items.values())
+        if total == 0:
+            yield event.plain_result(f"未找到 {hero_cn}({hero_en}) 的物品评级数据。")
+            return
+
+        if self.renderer:
+            try:
+                img_bytes = await self.renderer.render_tierlist_card(hero_en, hero_cn, tier_items)
+                yield event.chain_result([Comp.Image.fromBytes(img_bytes)])
+                return
+            except Exception as e:
+                logger.warning(f"Tier List 卡片渲染失败，回退文本: {e}")
+
+        lines = [f"📊 {hero_cn}({hero_en}) 物品评级 (共{total}个)", ""]
+        grade_emoji = {"S": "🏆", "A": "🥇", "B": "🥈", "C": "🥉"}
+        for grade in ["S", "A", "B", "C"]:
+            items = tier_items.get(grade, [])
+            if not items:
+                continue
+            lines.append(f"{grade_emoji.get(grade, '')} {grade} 级 ({len(items)}个):")
+            for it in items[:15]:
+                name_display = f"{it['name_cn']}({it['name']})" if it.get("name_cn") else it["name"]
+                lines.append(f"  {name_display} - {it['pct']:.1f}% ({it['build_count']}局)")
+            if len(items) > 15:
+                lines.append(f"  ... 还有{len(items) - 15}个")
+            lines.append("")
+        lines.append(f"数据来源: BazaarForge.gg | 阈值 S≥15% A≥8% B≥3% C>0%")
+        yield event.plain_result("\n".join(lines))
+
+    @filter.llm_tool(name="bazaar_query_tierlist")
+    async def tool_query_tierlist(self, event: AstrMessageEvent, hero_name: str):
+        '''查询 The Bazaar 游戏中某个英雄的物品评级（Tier List），显示该英雄最常用的物品及其使用率。当用户询问某个英雄哪些物品好用、物品推荐、装备排名、Tier List 时使用此工具。
+
+        Args:
+            hero_name(string): 英雄名称，支持中文或英文。例如：海盗、Vanessa、杜利、Dooley
+        '''
+        query = self._resolve_alias(hero_name)
+        hero_en = self._resolve_hero_name(query)
+        if not hero_en:
+            hero_en = query.strip().capitalize()
+            valid_heroes = ["Dooley", "Jules", "Mak", "Pygmalien", "Stelle", "Vanessa"]
+            if hero_en not in valid_heroes:
+                yield event.plain_result(
+                    f"未识别英雄「{hero_name}」。可用英雄: Dooley(杜利), Jules(朱尔斯), Mak(马克), Pygmalien(皮格马利翁), Stelle(斯黛拉), Vanessa(瓦妮莎)"
+                )
+                return
+
+        hero_cn = HERO_CN_MAP.get(hero_en, hero_en)
+        tier_items = await self._fetch_tierlist(hero_en)
+
+        total = sum(len(v) for v in tier_items.values())
+        if total == 0:
+            yield event.plain_result(f"未找到 {hero_cn}({hero_en}) 的物品评级数据。")
+            return
+
+        lines = [f"{hero_cn}({hero_en}) 物品评级 (共{total}个):"]
+        for grade in ["S", "A", "B", "C"]:
+            items = tier_items.get(grade, [])
+            if not items:
+                continue
+            lines.append(f"\n{grade} 级 ({len(items)}个):")
+            for it in items[:10]:
+                name_display = f"{it['name_cn']}({it['name']})" if it.get("name_cn") else it["name"]
+                lines.append(f"  {name_display} - {it['pct']:.1f}% ({it['build_count']}局)")
+            if len(items) > 10:
+                lines.append(f"  ... 还有{len(items) - 10}个")
+
+        lines.append(f"\n数据来源: BazaarForge.gg")
+        lines.append(f"💡 使用 /tbztier {hero_name} 查看图片版评级")
         yield event.plain_result("\n".join(lines))
 
     async def terminate(self):

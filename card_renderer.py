@@ -819,6 +819,125 @@ class CardRenderer:
         img.save(buf, format="PNG")
         return buf.getvalue()
 
+    async def render_tierlist_card(self, hero_en: str, hero_cn: str, tier_items: dict) -> bytes:
+        font_title = self._font(24 * SCALE)
+        font_subtitle = self._font(FONT_SIZE_SUBTITLE)
+        font_body = self._font(15 * SCALE)
+        font_small = self._font(FONT_SIZE_TAG)
+        font_link = self._font(FONT_SIZE_LINK)
+
+        tierlist_width = BUILD_CARD_WIDTH
+        content_width = tierlist_width - PADDING * 2
+
+        grade_colors = {
+            "S": (255, 69, 58),
+            "A": (255, 159, 10),
+            "B": (50, 215, 75),
+            "C": (100, 210, 255),
+        }
+        grade_labels = {"S": "S 级", "A": "A 级", "B": "B 级", "C": "C 级"}
+
+        total = sum(len(v) for v in tier_items.values())
+        header_h = 70 * SCALE
+
+        body_h = 0
+        for grade in ["S", "A", "B", "C"]:
+            items = tier_items.get(grade, [])
+            if not items:
+                continue
+            body_h += LINE_HEIGHT_SUBTITLE + SECTION_GAP
+            for it in items:
+                body_h += LINE_HEIGHT_BODY + 2 * SCALE
+            body_h += SECTION_GAP
+
+        footer_h = LINE_HEIGHT_LINK * 2 + PADDING
+        total_height = header_h + body_h + footer_h + PADDING * 3
+
+        img = Image.new("RGBA", (tierlist_width, total_height), COLORS["bg"])
+        draw = ImageDraw.Draw(img)
+
+        y = PADDING
+        self._draw_rounded_rect(draw, (0, 0, tierlist_width, header_h + PADDING), HEADER_RADIUS, COLORS["header_bg"])
+
+        draw.text((PADDING, y + 6 * SCALE), f"{hero_cn}({hero_en}) 物品评级", font=font_title, fill=COLORS["text"])
+        draw.text((PADDING, y + 38 * SCALE), f"共{total}个物品 | 数据来源: BazaarForge.gg", font=font_small, fill=COLORS["text_dim"])
+
+        y = header_h + PADDING + SECTION_GAP
+
+        for grade in ["S", "A", "B", "C"]:
+            items = tier_items.get(grade, [])
+            if not items:
+                continue
+
+            color = grade_colors.get(grade, COLORS["text"])
+            label = grade_labels.get(grade, grade)
+
+            badge_text = f" {label} ({len(items)}) "
+            bbox = font_subtitle.getbbox(badge_text)
+            bw = bbox[2] - bbox[0] + 12 * SCALE
+            draw.rounded_rectangle(
+                (PADDING, y, PADDING + bw, y + LINE_HEIGHT_SUBTITLE + 2 * SCALE),
+                radius=BADGE_RADIUS, fill=color
+            )
+            draw.text(
+                (PADDING + 6 * SCALE, y + 2 * SCALE), badge_text.strip(),
+                font=font_subtitle, fill=COLORS["bg"]
+            )
+            y += LINE_HEIGHT_SUBTITLE + SECTION_GAP
+
+            for it in items:
+                name_display = it["name"]
+                if it.get("name_cn"):
+                    name_display = f"{it['name_cn']}({it['name']})"
+
+                draw.text((PADDING + INDENT, y), name_display, font=font_body, fill=COLORS["text"])
+
+                pct_text = f"{it['pct']:.1f}%"
+                pct_bbox = font_body.getbbox(pct_text)
+                pct_w = pct_bbox[2] - pct_bbox[0]
+                pct_x = tierlist_width - PADDING - pct_w - 80 * SCALE
+                draw.text((pct_x, y), pct_text, font=font_body, fill=color)
+
+                count_text = f"{it['build_count']}局"
+                count_bbox = font_small.getbbox(count_text)
+                count_w = count_bbox[2] - count_bbox[0]
+                draw.text((tierlist_width - PADDING - count_w, y + 2 * SCALE), count_text, font=font_small, fill=COLORS["text_dim"])
+
+                bar_max_w = 50 * SCALE
+                bar_h = 6 * SCALE
+                bar_x = pct_x - bar_max_w - 8 * SCALE
+                bar_y = y + 10 * SCALE
+                max_pct = 30.0
+                bar_fill_w = max(2 * SCALE, int(bar_max_w * min(it["pct"] / max_pct, 1.0)))
+                draw.rounded_rectangle(
+                    (bar_x, bar_y, bar_x + bar_max_w, bar_y + bar_h),
+                    radius=2 * SCALE, fill=COLORS["divider"]
+                )
+                draw.rounded_rectangle(
+                    (bar_x, bar_y, bar_x + bar_fill_w, bar_y + bar_h),
+                    radius=2 * SCALE, fill=color
+                )
+
+                y += LINE_HEIGHT_BODY + 2 * SCALE
+
+            self._draw_divider(draw, y, tierlist_width)
+            y += SECTION_GAP
+
+        y += SECTION_GAP
+        draw.text(
+            (PADDING, y), f"阈值: S≥15% | A≥8% | B≥3% | C>0%",
+            font=font_link, fill=COLORS["text_dim"]
+        )
+        y += LINE_HEIGHT_LINK
+        draw.text(
+            (PADDING, y), "bazaarforge.gg",
+            font=font_link, fill=COLORS["accent"]
+        )
+
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return buf.getvalue()
+
     async def render_build_card(self, query: str, search_term: str, builds: list) -> bytes:
         font_title = self._font(24 * SCALE)
         font_subtitle = self._font(FONT_SIZE_SUBTITLE)

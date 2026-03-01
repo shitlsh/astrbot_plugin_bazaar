@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  查询怪物 · 物品 · 技能 · 事件 · 推荐阵容 · 更新公告 · 图片卡片展示
+  查询怪物 · 物品 · 技能 · 事件 · 推荐阵容 · 物品评级 · 更新公告 · 图片卡片展示
 </p>
 
 ---
@@ -37,13 +37,17 @@ BazaarHelper 是一个基于 Tauri 构建的 The Bazaar 游戏辅助工具，提
 | 技能 | 448 | `skills_db.json` |
 | 事件 | 39 | `event_detail.json` + `event_encounters.json`（英雄/品质增强） |
 
+### BazaarForge
+
+阵容推荐和物品评级功能的主要数据来源于 **[BazaarForge.gg](https://bazaarforge.gg/)**。
+
+BazaarForge 提供结构化的阵容数据（包含胜场、胜利类型、等级、物品列表等），以及基于社区阵容统计的物品使用率数据，用于生成英雄物品评级（Tier List）。
+
 ### Bazaar Builds
 
-阵容推荐功能的数据来源于 **[bazaar-builds.net](https://bazaar-builds.net/)**。
+阵容推荐功能的补充数据来源于 **[bazaar-builds.net](https://bazaar-builds.net/)**。
 
-Bazaar Builds 是一个由社区驱动的 The Bazaar 阵容分享网站，玩家可以在上面分享自己的通关阵容截图和心得。本插件通过其公开的 WordPress REST API 搜索相关阵容，并将阵容截图直接发送给用户。
-
-访问 [bazaar-builds.net/tag/billboard/](https://bazaar-builds.net/tag/billboard/) 可以浏览精选阵容。
+当 BazaarForge 结果不足时，自动从 bazaar-builds.net 补充查询。也可通过配置切换数据源优先级。
 
 ### Steam 更新公告
 
@@ -59,7 +63,9 @@ Bazaar Builds 是一个由社区驱动的 The Bazaar 阵容分享网站，玩家
 - 统一的多条件搜索：支持关键词、标签、品质、英雄、尺寸条件组合
 - 智能分词：中文连写自动识别条件，如 `/tbzsearch 杜利中型灼烧`
 - 按英雄筛选事件：`/tbzsearch hero:Jules` 可过滤该英雄相关事件
-- 通过物品名查询社区推荐阵容（展示阵容截图）
+- 通过物品名查询社区推荐阵容（BazaarForge + bazaar-builds.net 双数据源）
+- 英雄物品评级（Tier List）：按使用率 S/A/B/C 分级，图片卡片展示
+- API 响应缓存：减少重复请求，提升响应速度
 - 别名系统：支持社区昵称映射，可通过 AstrBot 管理面板或命令管理
 - 在线数据更新：一键从 BazaarHelper 仓库拉取最新数据
 - AI 工具集成：AI 在聊天中自动调用物品查询、搜索、阵容推荐、更新公告等功能
@@ -110,6 +116,7 @@ sudo yum install wqy-zenhei-fonts
 | `/tbzsearch <条件>` | 多条件搜索（含事件按英雄过滤） | `/tbzsearch 杜利中型灼烧` |
 | `/tbznews [数量]` | 查询游戏官方更新公告（图片） | `/tbznews` 或 `/tbznews 3` |
 | `/tbzbuild <物品名> [数量]` | 查询推荐阵容 | `/tbzbuild 符文匕首 5` |
+| `/tbztier <英雄名>` | 查询英雄物品评级（Tier List） | `/tbztier 海盗` |
 | `/tbzalias` | 别名管理 | `/tbzalias list hero` |
 | `/tbzupdate` | 从远端更新游戏数据 | `/tbzupdate` |
 
@@ -168,7 +175,7 @@ sudo yum install wqy-zenhei-fonts
 
 ## AI 工具集成
 
-插件注册了 8 个 AI 工具（`@llm_tool`），当 AstrBot 配置了支持函数调用的 LLM 后，AI 可以在对话中自动调用这些功能，无需用户手动输入指令：
+插件注册了 9 个 AI 工具（`@llm_tool`），当 AstrBot 配置了支持函数调用的 LLM 后，AI 可以在对话中自动调用这些功能，无需用户手动输入指令：
 
 | 工具名 | 功能 | 触发场景示例 |
 |--------|------|-------------|
@@ -179,6 +186,7 @@ sudo yum install wqy-zenhei-fonts
 | `bazaar_search` | 多条件搜索 | "有哪些黄金武器？" |
 | `bazaar_query_build` | 查询推荐阵容 | "海盗船锚怎么搭配？" |
 | `bazaar_get_news` | 查询更新公告 | "最近更新了什么？" |
+| `bazaar_query_tierlist` | 查询英雄物品评级 | "海盗哪些物品好用？" |
 
 AI 会根据用户的自然语言自动选择合适的工具调用，并将结果整合到回复中。
 
@@ -210,6 +218,7 @@ AI 会根据用户的自然语言自动选择合适的工具调用，并将结�
 | `size_aliases` | 尺寸别名 | text (JSON) |
 | `build_default_count` | 阵容查询默认返回数量（1-10） | int |
 | `news_default_count` | 更新公告默认获取数量（1-20） | int |
+| `build_source_priority` | 阵容数据源优先级 | text |
 
 ## 项目结构
 
@@ -255,6 +264,7 @@ curl -o event_encounters.json https://raw.githubusercontent.com/Duangi/BazaarHel
 ## 致谢
 
 - **[BazaarHelper](https://github.com/Duangi/BazaarHelper)** — 游戏数据来源，由 [Duangi](https://github.com/Duangi) 维护
+- **[BazaarForge.gg](https://bazaarforge.gg/)** — 阵容推荐和物品评级数据来源
 - **[bazaar-builds.net](https://bazaar-builds.net/)** — 社区阵容推荐数据来源
 - **[Steam](https://store.steampowered.com/app/1617400/)** — 游戏更新公告数据来源
 - **[AstrBot](https://github.com/Soulter/AstrBot)** — 聊天机器人框架
