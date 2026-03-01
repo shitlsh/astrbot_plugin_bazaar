@@ -1,0 +1,1358 @@
+[
+  {
+    "id": "57nenni59sep3kgpol3hem1gz",
+    "name": "Vanessa",
+    "name_slug": "vanessa",
+    "description": "Purchase an item from this Hero",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/bc4472e65c587af07e7b45c6b10b6b4bbdd5dbd2@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/f9fd47489b803fbcb755f5beedf40586c90e53d8@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/bc4472e65c587af07e7b45c6b10b6b4bbdd5dbd2@256.webp/encounter?v=2&amp;fg=f9fd47489b803fbcb755f5beedf40586c90e53d8&amp;sig=2JKe%2Bu2HaACMAEFTqZybdrFbDZo%3D",
+    "tier": "Diamond",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T15:59:59.58742+00:00",
+    "updated_at": "2026-01-06T15:59:59.58742+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "d11h44h2f3xp0oancaytdy0xz",
+    "name": "Aila",
+    "name_slug": "aila",
+    "description": "Sells Weapons",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/8f0640b978ed00bc501451de7bc7defa669fcc31@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/699576b1a8cff163a7fda26b31463840dfa0b19f@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/8f0640b978ed00bc501451de7bc7defa669fcc31@256.webp/encounter?v=2&amp;fg=699576b1a8cff163a7fda26b31463840dfa0b19f&amp;sig=ePKqI4zaf9Xg%2Fs%2FnIOsSQTORuYM%3D",
+    "tier": "Bronze",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:00:35.580424+00:00",
+    "updated_at": "2026-01-06T16:00:35.580424+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "6ngxt2m2txp73uiwnua5nl0ye",
+    "name": "Ande",
+    "name_slug": "ande",
+    "description": "Sells Small items",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/3b3a0b480e20476a6bf8cd79e92d3aa8cd876e4c@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/95b39e812b272bbd40c36f8141dfc6bacded37e0@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/3b3a0b480e20476a6bf8cd79e92d3aa8cd876e4c@256.webp/encounter?v=2&amp;fg=95b39e812b272bbd40c36f8141dfc6bacded37e0&amp;sig=Owf2ayCay3wg3Gu3Ui36PY5QYx0%3D",
+    "tier": "Bronze",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:12:34.125828+00:00",
+    "updated_at": "2026-01-06T16:12:34.125828+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "8gv4xxdquhagkoe8r3e6793fg",
+    "name": "Barkun",
+    "name_slug": "barkun",
+    "description": "Sells Medium and Large items. Buys your Small items at +1 Value.",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/adca502af6c0383bdf52b57d47ee2e0f03c18492@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/072dd775452c3281f995cfedac02ee03066d49ee@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/adca502af6c0383bdf52b57d47ee2e0f03c18492@256.webp/encounter?v=2&amp;fg=072dd775452c3281f995cfedac02ee03066d49ee&amp;sig=SE2r5Klc7%2FQjHnz6BDmFxW9o8c8%3D",
+    "tier": "Silver",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:24:19.115475+00:00",
+    "updated_at": "2026-01-06T16:24:19.115475+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "ahkptyzeddmsxfxr96dtv3zio",
+    "name": "Chronos",
+    "name_slug": "chronos",
+    "description": "Sells Haste items.",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/bc2c268c32abc6e159d4ad039de9b80c1bdd9700@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/192bada936c66e6d638513da09bcc694837161c2@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/bc2c268c32abc6e159d4ad039de9b80c1bdd9700@256.webp/encounter?v=2&amp;fg=192bada936c66e6d638513da09bcc694837161c2&amp;sig=r2asqg6zdGCoyLWOmbacvtoUf5Q%3D",
+    "tier": "Diamond",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:24:57.345441+00:00",
+    "updated_at": "2026-01-06T16:24:57.345441+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "e5oz49zxqmkcn6lhgqdils7uy",
+    "name": "Cobweb",
+    "name_slug": "cobweb",
+    "description": "Sells Slow items.",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/101432e02dce5d14dde53276cbbc9758b102abba@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/1cc90f208edac45a7bb3574c395969dee214bb58@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/101432e02dce5d14dde53276cbbc9758b102abba@256.webp/encounter?v=2&amp;fg=1cc90f208edac45a7bb3574c395969dee214bb58&amp;sig=W82aZQPoqymxMJIZMNh7%2BAKToa8%3D",
+    "tier": "Diamond",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:25:10.461221+00:00",
+    "updated_at": "2026-01-06T16:25:10.461221+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "7nusi52dp6d3vky6a0mjykmkp",
+    "name": "Colt",
+    "name_slug": "colt",
+    "description": "Sells Ammo items",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/2609cd01c22c5d96e44a7cdda843963d8188cb38@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/42857a1e0b3e5c3168cb07f88faee0de8ecfcdbd@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/2609cd01c22c5d96e44a7cdda843963d8188cb38@256.webp/encounter?v=2&amp;fg=42857a1e0b3e5c3168cb07f88faee0de8ecfcdbd&amp;sig=wn4u%2BLHLIJ3HOvSv85BOQAXedZE%3D",
+    "tier": "Silver",
+    "heroes": [
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:25:31.577133+00:00",
+    "updated_at": "2026-01-06T16:25:31.577133+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "brq5ht02ajpseka5ehjh4tzy3",
+    "name": "Curio",
+    "name_slug": "curio",
+    "description": "Sells Bronze-tier Neutral items.",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/375b8fe4b243e7e54b82bec1b05c4db05abee6ef@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/ceadccd95c6e860c766129341e073ebd446dc99f@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/375b8fe4b243e7e54b82bec1b05c4db05abee6ef@256.webp/encounter?v=2&amp;fg=ceadccd95c6e860c766129341e073ebd446dc99f&amp;sig=KEdyx3LY9n50P8ex%2B6LutRK4%2FqA%3D",
+    "tier": "Silver",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:25:59.114985+00:00",
+    "updated_at": "2026-01-06T16:25:59.114985+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "444rvq5g12sodlqmt4p2p453s",
+    "name": "Dooley",
+    "name_slug": "dooley",
+    "description": "Purchase an item from this Hero",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/5f9c8d88d618e521fa1753f8aee1a84c84c5078d@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/47dad6c0d9d0b544755aa70bf71fb24ba0da6a35@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/5f9c8d88d618e521fa1753f8aee1a84c84c5078d@256.webp/encounter?v=2&amp;fg=47dad6c0d9d0b544755aa70bf71fb24ba0da6a35&amp;sig=F3skRVLtDjd0CPYMM4CQAtvpmpk%3D",
+    "tier": "Diamond",
+    "heroes": [
+      "Stelle",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:26:12.975222+00:00",
+    "updated_at": "2026-01-06T16:26:12.975222+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "xzkabqz8d77zgtcqskagbqy5",
+    "name": "Eli",
+    "name_slug": "eli",
+    "description": "Sells Potions",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/4a5f0b9b6a9bff17bf8cf1ceb05a875b1d4f5153@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/634c535be1976fe9db5bdf0dfbc978ce5371b3c7@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/4a5f0b9b6a9bff17bf8cf1ceb05a875b1d4f5153@256.webp/encounter?v=2&amp;fg=634c535be1976fe9db5bdf0dfbc978ce5371b3c7&amp;sig=0PO%2F3c%2BTJS5QYR98LyuQYsjpwB0%3D",
+    "tier": "Silver",
+    "heroes": [
+      "Mak"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:26:22.78145+00:00",
+    "updated_at": "2026-01-06T16:26:22.78145+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "7byhy4vg1r2rcbb298v7zpw3b",
+    "name": "Flex",
+    "name_slug": "flex",
+    "description": "Sells Max Health items.",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/49203282380d2fe6baf8306f4967de1bb4adbd09@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/44c0eacb3c3d8798b1b55f2f7d91d9e3f9b667c9@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/49203282380d2fe6baf8306f4967de1bb4adbd09@256.webp/encounter?v=2&amp;fg=44c0eacb3c3d8798b1b55f2f7d91d9e3f9b667c9&amp;sig=YNvo4rrqXqVvLheZQ59tKHSc9bY%3D",
+    "tier": "Diamond",
+    "heroes": [
+      "Pygmalien"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:26:32.275355+00:00",
+    "updated_at": "2026-01-06T16:26:32.275355+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "bi261ylv8jkezz869zq2r44z5",
+    "name": "Freiya",
+    "name_slug": "freiya",
+    "description": "Sells Freeze items.",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/c3dbda3a3cff5af3d2f78060e9bf139faebb329b@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/fc5805b2ed09a871660ffac332dcc4df31161c78@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/c3dbda3a3cff5af3d2f78060e9bf139faebb329b@256.webp/encounter?v=2&amp;fg=fc5805b2ed09a871660ffac332dcc4df31161c78&amp;sig=J9HxacGzqbGz%2BZzOUoxVjnt9LqI%3D",
+    "tier": "Legendary",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:26:52.83022+00:00",
+    "updated_at": "2026-01-06T16:26:52.83022+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "9gjn4ufacsmlw52a8oxtan85k",
+    "name": "Gaseo",
+    "name_slug": "gaseo",
+    "description": "Sells Apparel from any Hero",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/b341d1fe987144b8eca6ecf736453f2a52845118@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/8eecede57d6dd7161f09cdeb00f60e9cd090b164@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/b341d1fe987144b8eca6ecf736453f2a52845118@256.webp/encounter?v=2&amp;fg=8eecede57d6dd7161f09cdeb00f60e9cd090b164&amp;sig=xnk0ixUxV%2BZcxkd314qgzifT7Bo%3D",
+    "tier": "Gold",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:27:04.652057+00:00",
+    "updated_at": "2026-01-06T16:27:04.652057+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "blewgkvrtyfunx5r97rovkxce",
+    "name": "Gastro",
+    "name_slug": "gastro",
+    "description": "Sells Foods",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/890318ef587b642d0f7c4e7fa416a1f5f531a3f6@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/abbeece0fdc9c55ad6ae7114cccf083f37d9064d@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/890318ef587b642d0f7c4e7fa416a1f5f531a3f6@256.webp/encounter?v=2&amp;fg=abbeece0fdc9c55ad6ae7114cccf083f37d9064d&amp;sig=xt5KRr%2BQmMwOVArH80G3KuVi0EA%3D",
+    "tier": "Silver",
+    "heroes": [
+      "Jules"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:27:13.697514+00:00",
+    "updated_at": "2026-01-06T16:27:13.697514+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "1v0tbzld809wutx0ilshjdkbt",
+    "name": "Goldie",
+    "name_slug": "goldie",
+    "description": "Sells Gold-tier items",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/11deb34c679f58b21fba31d5021966b7ca6fb1c6@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/c24b2145b107bfa11abad2a30a536f5db3a3a961@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/11deb34c679f58b21fba31d5021966b7ca6fb1c6@256.webp/encounter?v=2&amp;fg=c24b2145b107bfa11abad2a30a536f5db3a3a961&amp;sig=w7JojGuYPXXROSAJQUeEwSsfJpg%3D",
+    "tier": "Gold",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:27:23.310534+00:00",
+    "updated_at": "2026-01-06T16:27:23.310534+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "40mjwwcw58li5nkbu3wrfrf67",
+    "name": "Hef",
+    "name_slug": "hef",
+    "description": "Sells Burn items.",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/37fa4b1c76dab082d8c9c3592aa6487644c80184@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/bfd5375f4f40ad7140289dced530da229085e259@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/37fa4b1c76dab082d8c9c3592aa6487644c80184@256.webp/encounter?v=2&amp;fg=bfd5375f4f40ad7140289dced530da229085e259&amp;sig=bQSO%2F3l3NyWhaAvDZDwZt3qmEXs%3D",
+    "tier": "Diamond",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:28:15.730822+00:00",
+    "updated_at": "2026-01-06T16:28:15.730822+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "2b6qbiklchzf3b3wdlj3n8vny",
+    "name": "Herma",
+    "name_slug": "herma",
+    "description": "Sells Heal and Regen items",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/38370d0c867a818594e403f65184846b85c471a4@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/4e1f1597f946f7138e43214c76f8f81a3196d24d@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/38370d0c867a818594e403f65184846b85c471a4@256.webp/encounter?v=2&amp;fg=4e1f1597f946f7138e43214c76f8f81a3196d24d&amp;sig=aPJlt9em3hSUeksBfoAAKs7esXo%3D",
+    "tier": "Silver",
+    "heroes": [
+      "Mak",
+      "Pygmalien",
+      "Jules"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:28:23.687717+00:00",
+    "updated_at": "2026-01-06T16:28:23.687717+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "7ki80mw1zwgm8dbr3cien9eje",
+    "name": "Jules",
+    "name_slug": "jules",
+    "description": "Purchase an item from this Hero",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/55690f1d1af4652f8f6531a1bab0bf73527ae0f8@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/c4a14d484a4c12448a8c2b1f4fe60184b72d3e43@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/55690f1d1af4652f8f6531a1bab0bf73527ae0f8@256.webp/encounter?v=2&amp;fg=c4a14d484a4c12448a8c2b1f4fe60184b72d3e43&amp;sig=F72zd2oQD8%2FjamddKuP4dpK2e4Y%3D",
+    "tier": "Diamond",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:28:42.826113+00:00",
+    "updated_at": "2026-01-06T16:28:42.826113+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "9rm2jk50kxh2cktbazgt767yx",
+    "name": "Kev's Armory",
+    "name_slug": "kev-s-armory",
+    "description": "Sells Health and Shield items",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/9db56d3ac57e2812dbf79214be0f642afa81926e@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/c4205a4ac720a0c4ae53e007340e50bda989b108@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/9db56d3ac57e2812dbf79214be0f642afa81926e@256.webp/encounter?v=2&amp;fg=c4205a4ac720a0c4ae53e007340e50bda989b108&amp;sig=1%2BZA0BXkafGtb9pl5czi6tv5OUQ%3D",
+    "tier": "Silver",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:28:52.005355+00:00",
+    "updated_at": "2026-01-06T16:28:52.005355+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "5ezdfi229tsymn51shmnka5li",
+    "name": "Kina",
+    "name_slug": "kina",
+    "description": "Sells non-Weapon items.",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/b6469c012ea61f1757eb2e51fc3c7e427435a964@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/0f991e22fee7265867b9dea0cc3c73027cda95d1@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/b6469c012ea61f1757eb2e51fc3c7e427435a964@256.webp/encounter?v=2&amp;fg=0f991e22fee7265867b9dea0cc3c73027cda95d1&amp;sig=0mZD%2FsRviadj7aTwrSYF3tNj9mk%3D",
+    "tier": "Bronze",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:39:52.709578+00:00",
+    "updated_at": "2026-01-06T16:39:52.709578+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "2bp79ve1ot5jl5fyv9ff17grm",
+    "name": "Knightshade",
+    "name_slug": "knightshade",
+    "description": "Sells Poison items.",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/9b9127fdce533043293b789fa779b68a7bd1ac27@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/fa1e4539da3fc3b74b15a974ab593ecc6aea7aa3@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/9b9127fdce533043293b789fa779b68a7bd1ac27@256.webp/encounter?v=2&amp;fg=fa1e4539da3fc3b74b15a974ab593ecc6aea7aa3&amp;sig=hHIhNn5GHiuI6PglS1yZpOnJezc%3D",
+    "tier": "Diamond",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:40:11.192215+00:00",
+    "updated_at": "2026-01-06T16:40:11.192215+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "84d9hslkw5l0k7br4j0zu6ozc",
+    "name": "Luxe",
+    "name_slug": "luxe",
+    "description": "Sells Diamond-tier items",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/39c410d8b08a14b17ca694112961d8557b20e931@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/3c3c4a400defd4f1ca5ccba4d6094a3ca5bb31e1@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/39c410d8b08a14b17ca694112961d8557b20e931@256.webp/encounter?v=2&amp;fg=3c3c4a400defd4f1ca5ccba4d6094a3ca5bb31e1&amp;sig=2OCFi1Xq3t%2BBggjI2jKrHO%2FykxE%3D",
+    "tier": "Diamond",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:40:22.06215+00:00",
+    "updated_at": "2026-01-06T16:40:22.06215+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "41wp83fcuwnoj1iw53bcvp1pn",
+    "name": "Mak",
+    "name_slug": "mak",
+    "description": "Purchase an item from this Hero",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/84b114f87b50923ef765c4b81fdc5f306cde4561@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/295e743bfe7d8bf4d679a91f8a4063cdcd40b19d@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/84b114f87b50923ef765c4b81fdc5f306cde4561@256.webp/encounter?v=2&amp;fg=295e743bfe7d8bf4d679a91f8a4063cdcd40b19d&amp;sig=4nBBvUR4WU4A1Jo5JzAjgxc57OY%3D",
+    "tier": "Diamond",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:40:32.871301+00:00",
+    "updated_at": "2026-01-06T16:40:32.871301+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "ay76kvxarft6ks1litg7if4vt",
+    "name": "Midsworth",
+    "name_slug": "midsworth",
+    "description": "Sells Small and Large items. Buys your Medium items at +2 value.",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/b6d948b42100caaa4537cfe687bac3259b1bd026@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/1623984d3951adc0a4e1b0fc171095c946fe66aa@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/b6d948b42100caaa4537cfe687bac3259b1bd026@256.webp/encounter?v=2&amp;fg=1623984d3951adc0a4e1b0fc171095c946fe66aa&amp;sig=ulE6OLKtT%2Bfpgv8nvJtC3ZqviR8%3D",
+    "tier": "Silver",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:40:46.761696+00:00",
+    "updated_at": "2026-01-06T16:40:46.761696+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "8leo2xc196ana82ylt1l1cj0m",
+    "name": "Mittel",
+    "name_slug": "mittel",
+    "description": "Sells Medium items",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/91f7820ac4d3c629e7027661e4365ed6407b24f0@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/01665d7807ac1df4398ce4ca782282acfd9d8518@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/91f7820ac4d3c629e7027661e4365ed6407b24f0@256.webp/encounter?v=2&amp;fg=01665d7807ac1df4398ce4ca782282acfd9d8518&amp;sig=bqcT88EmOC8aFbyNvP5cd%2FUrtUs%3D",
+    "tier": "Bronze",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:40:54.20862+00:00",
+    "updated_at": "2026-01-06T16:40:54.20862+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "dfwxsam228ypx407ginucc5fm",
+    "name": "Mr. Morland",
+    "name_slug": "mr-morland",
+    "description": "Sells Property items",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/6d2c15f001f95430341f508fb6c0bcc6cca9ccb3@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/9de254b55e0d4770a2c48fde26a5910a942ec02a@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/6d2c15f001f95430341f508fb6c0bcc6cca9ccb3@256.webp/encounter?v=2&amp;fg=9de254b55e0d4770a2c48fde26a5910a942ec02a&amp;sig=JZMcdz8q2jziS6CJ6yFC6KVDJr8%3D",
+    "tier": "Gold",
+    "heroes": [
+      "Pygmalien"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:41:03.3008+00:00",
+    "updated_at": "2026-01-06T16:41:03.3008+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "1joy3ykdkehmvqaym6cgygdgw",
+    "name": "Nautica",
+    "name_slug": "nautica",
+    "description": "Sells Aquatic items",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/ed695fc08b29280962ff8b6feb9303a02b04b1f1@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/b21c44c5cebf0501e78683b5996b9de8e40cf3c1@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/ed695fc08b29280962ff8b6feb9303a02b04b1f1@256.webp/encounter?v=2&amp;fg=b21c44c5cebf0501e78683b5996b9de8e40cf3c1&amp;sig=Np%2F5pNwUyr18i91AmRKJN8DMNhk%3D",
+    "tier": "Silver",
+    "heroes": [
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:41:12.087971+00:00",
+    "updated_at": "2026-01-06T16:41:12.087971+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "cinkf8va3q005u3088yw8v1kg",
+    "name": "Orion",
+    "name_slug": "orion",
+    "description": "Sells Tools",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/d601e3ed398445eae3b1fde8bdf2a8e6b9517be2@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/b28e1469ba60a140b61491aa0a31f6a31ac1b8cc@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/d601e3ed398445eae3b1fde8bdf2a8e6b9517be2@256.webp/encounter?v=2&amp;fg=b28e1469ba60a140b61491aa0a31f6a31ac1b8cc&amp;sig=Y9CQ07Z%2FsEx%2Fvj%2FaEMRSEfkTPeY%3D",
+    "tier": "Silver",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:41:20.664934+00:00",
+    "updated_at": "2026-01-06T16:41:20.664934+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "6nk6vjjeikn5qegp46bn9zmq8",
+    "name": "Pinfeather",
+    "name_slug": "pinfeather",
+    "description": "Sells Flying items",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/c164b330f56209786052d941a6bb768adf682a3f@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/5053f607e492d0c3070521f2dbab902aff7c4c97@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/c164b330f56209786052d941a6bb768adf682a3f@256.webp/encounter?v=2&amp;fg=5053f607e492d0c3070521f2dbab902aff7c4c97&amp;sig=HQnOQw5Jcj0AOYF3XWxk%2FvAR0kk%3D",
+    "tier": "Silver",
+    "heroes": [
+      "Stelle"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:41:28.903712+00:00",
+    "updated_at": "2026-01-06T16:41:28.903712+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "dky9pz5nxbefpbxsmcrks2b6",
+    "name": "Pol",
+    "name_slug": "pol",
+    "description": "Sells Large items",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/2219210c388e141c7f5e5bad1b197541cee65e76@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/e90f34cc8bd6a9967b5cbb264c72f6aae15a8ee0@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/2219210c388e141c7f5e5bad1b197541cee65e76@256.webp/encounter?v=2&amp;fg=e90f34cc8bd6a9967b5cbb264c72f6aae15a8ee0&amp;sig=DT%2F%2FA5HAP2Nt81REFAbuvg22%2B%2BU%3D",
+    "tier": "Silver",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:41:38.364432+00:00",
+    "updated_at": "2026-01-06T16:41:38.364432+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "at3i3yskhcirnjoq4m5lkbgvg",
+    "name": "Serafina",
+    "name_slug": "serafina",
+    "description": "Sells Enchanted items",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/1d2f71d0e24bebbcbea4b89c9f3f34f70ff8868e@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/ef471290f13e371ce42c3963e65ffc699f546614@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/1d2f71d0e24bebbcbea4b89c9f3f34f70ff8868e@256.webp/encounter?v=2&amp;fg=ef471290f13e371ce42c3963e65ffc699f546614&amp;sig=rb3MKa0u8qeUHxyJOdXZVYpHmB4%3D",
+    "tier": "Diamond",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:42:18.721074+00:00",
+    "updated_at": "2026-01-06T16:42:18.721074+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "220qp6otgr3pmp3x0vb4tnjnf",
+    "name": "Tatiana",
+    "name_slug": "tatiana",
+    "description": "Sells Toys from any Hero",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/4f4d401c0346b8dbdfaf71d554926886add6a1e9@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/79aef351dd9e4051710eba3fb7f795c08d3d46a1@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/4f4d401c0346b8dbdfaf71d554926886add6a1e9@256.webp/encounter?v=2&amp;fg=79aef351dd9e4051710eba3fb7f795c08d3d46a1&amp;sig=B%2B%2FobCb3TTTFV2ns454sEc9rI9A%3D",
+    "tier": "Gold",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:42:44.659776+00:00",
+    "updated_at": "2026-01-06T16:42:44.659776+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "dqzzc5hijdgdtu1ozjd5tl8fw",
+    "name": "The Antiquarian",
+    "name_slug": "the-antiquarian",
+    "description": "Sells Relics from any Hero",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/8e8ae48f634b5a3351bb188da7e2f8def2d22a43@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/12ee548ae0b6d47956aec01572ab231cd8eeaf7b@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/8e8ae48f634b5a3351bb188da7e2f8def2d22a43@256.webp/encounter?v=2&amp;fg=12ee548ae0b6d47956aec01572ab231cd8eeaf7b&amp;sig=hF0nxMoJ9EMipFlWFu3idENJeTk%3D",
+    "tier": "Gold",
+    "heroes": [
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:42:57.326776+00:00",
+    "updated_at": "2026-01-06T16:42:57.326776+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "b6i30p2kzbxd510774qrix1sv",
+    "name": "Prospero",
+    "name_slug": "prospero",
+    "description": "Sells Economic items",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/412ebd32f682b6e51ccfaa0a74617e2dc59e49fc@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/0048405bb795b363ee5c0493dcac2e85ff530cdc@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/412ebd32f682b6e51ccfaa0a74617e2dc59e49fc@256.webp/encounter?v=2&amp;fg=0048405bb795b363ee5c0493dcac2e85ff530cdc&amp;sig=Q73yzeFo6kB1P%2BcZpHrEjE%2FyLhE%3D",
+    "tier": "Gold",
+    "heroes": [
+      "Pygmalien"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:41:51.795059+00:00",
+    "updated_at": "2026-01-06T16:41:51.795059+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "eqr1fzleeujl1sc455axwvcwh",
+    "name": "Pygmalien",
+    "name_slug": "pygmalien",
+    "description": "Purchase an item from this Hero",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/7cd39ac7c34a1b895a7aeabf90f5b2c7e663410d@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/7766c6b779c770929f1871a81f2a1da0dae126a3@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/7cd39ac7c34a1b895a7aeabf90f5b2c7e663410d@256.webp/encounter?v=2&amp;fg=7766c6b779c770929f1871a81f2a1da0dae126a3&amp;sig=DdTwtDiJSG%2F27PcmzK5g5d%2FvnhE%3D",
+    "tier": "Diamond",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:41:58.908386+00:00",
+    "updated_at": "2026-01-06T16:41:58.908386+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "2z2y7vy3g9re27pvya6y85rcp",
+    "name": "Quixel",
+    "name_slug": "quixel",
+    "description": "Sells Small and Medium items. Buys your Large items at +3 value.",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/d7b6e01789a608fd0523cf274aa8835bd5167922@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/f01741a71fa09b2e52f8debe18ce6b2f6df55f2a@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/d7b6e01789a608fd0523cf274aa8835bd5167922@256.webp/encounter?v=2&amp;fg=f01741a71fa09b2e52f8debe18ce6b2f6df55f2a&amp;sig=0xiyYNERN3GLVCosTRoGGw2xQQA%3D",
+    "tier": "Silver",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:42:09.959302+00:00",
+    "updated_at": "2026-01-06T16:42:09.959302+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "3w8xts38wkdoef0b9gjhgg4wp",
+    "name": "The Tester",
+    "name_slug": "the-tester",
+    "description": "Sells Tech items from any Hero",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/d145b8bac8c87685060dcc248f98b5d7e2e42260@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/2972ebb93d8e8f1d80c7ebb4cccd122422f28258@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/d145b8bac8c87685060dcc248f98b5d7e2e42260@256.webp/encounter?v=2&amp;fg=2972ebb93d8e8f1d80c7ebb4cccd122422f28258&amp;sig=5tsfBVl4MQkyrtrL%2FSoId2ZWk5U%3D",
+    "tier": "Silver",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:43:05.691353+00:00",
+    "updated_at": "2026-01-06T16:43:05.691353+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "e029o1it0ad3s39pcy6yd03bt",
+    "name": "Silvia",
+    "name_slug": "silvia",
+    "description": "Sells Silver-tier items",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/ca872b5fa4622359e22d468437c49be96b121017@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/d09004de4a916237a6ea6a6c946886ee21351ccc@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/ca872b5fa4622359e22d468437c49be96b121017@256.webp/encounter?v=2&amp;fg=d09004de4a916237a6ea6a6c946886ee21351ccc&amp;sig=SMueM8tlaJBmALtPG%2FqH%2BZesPnI%3D",
+    "tier": "Silver",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:42:28.406423+00:00",
+    "updated_at": "2026-01-06T16:42:28.406423+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "aipwa192ide2e02w4brramo6y",
+    "name": "Tinker",
+    "name_slug": "tinker",
+    "description": "Sells Friend items",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/49c84b2b044a3ac766f2c2a79301015fa7412be8@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/ecbe0542617e410ed0f3f934375c726707368279@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/49c84b2b044a3ac766f2c2a79301015fa7412be8@256.webp/encounter?v=2&amp;fg=ecbe0542617e410ed0f3f934375c726707368279&amp;sig=QLYxJbHySV5lsxedT3UG8U5lZHQ%3D",
+    "tier": "Silver",
+    "heroes": [
+      "Dooley"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:43:13.293409+00:00",
+    "updated_at": "2026-01-06T16:43:13.293409+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "dj3bndn98vme3bgv9nv8r3hg6",
+    "name": "Stelle",
+    "name_slug": "stelle",
+    "description": "Purchase an item from this Hero",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/f8f38acc7332e5fc7e2c3bb6bb564539030a18f9@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/4d4337246926157ad62c5a015ab6bee21b15395f@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/f8f38acc7332e5fc7e2c3bb6bb564539030a18f9@256.webp/encounter?v=2&amp;fg=4d4337246926157ad62c5a015ab6bee21b15395f&amp;sig=MqrfL28fsiK%2F3YGrJ7lzrWAlupk%3D",
+    "tier": "Diamond",
+    "heroes": [
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:42:35.922932+00:00",
+    "updated_at": "2026-01-06T16:42:35.922932+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "3p9iyc3mo89tupqhkrkcylbk7",
+    "name": "Tok's Clocks",
+    "name_slug": "tok-s-clocks",
+    "description": "Sells Haste, Slow and Cooldown items.",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/f11e94cba9e6eda1e911cca5dbc4ce2ecdb07c94@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/e22b89509ce37a56e64e9c4c823ad62c48cf2775@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/f11e94cba9e6eda1e911cca5dbc4ce2ecdb07c94@256.webp/encounter?v=2&amp;fg=e22b89509ce37a56e64e9c4c823ad62c48cf2775&amp;sig=VlMwbRfD4pWjPAVPYNJ9iOVIT2Y%3D",
+    "tier": "Silver",
+    "heroes": [
+      "Dooley",
+      "Mak",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:43:21.685281+00:00",
+    "updated_at": "2026-01-06T16:43:21.685281+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "dhc76lxgmotldxmke87iq6vbu",
+    "name": "Valpak",
+    "name_slug": "valpak",
+    "description": "Sells items. Always sells a discounted item.",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/e281512b3aafd3244041b4b20b9c3e39ed6fa95d@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/c41e7a7d48533db12237c323c70f26731e166040@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/e281512b3aafd3244041b4b20b9c3e39ed6fa95d@256.webp/encounter?v=2&amp;fg=c41e7a7d48533db12237c323c70f26731e166040&amp;sig=Lmgd%2FXSrqc4m99tUBTVHrOSCVk0%3D",
+    "tier": "Silver",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:43:30.577895+00:00",
+    "updated_at": "2026-01-06T16:43:30.577895+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "9xfv13fznmy8r9qzvf6swgp8o",
+    "name": "Adira",
+    "name_slug": "adira",
+    "description": "Teaches Diamond-tier Skills",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/12fd3a114432c101edaecad2b83ee575bdadef4f@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/d23a053bc8de214093e35e142921becd33626e0f@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/12fd3a114432c101edaecad2b83ee575bdadef4f@256.webp/encounter?v=2&amp;fg=d23a053bc8de214093e35e142921becd33626e0f&amp;sig=sXZT6CvKcFeu7Ay1DqAYXpGG%2B08%3D",
+    "tier": "Diamond",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T17:48:01.33511+00:00",
+    "updated_at": "2026-01-06T17:48:01.33511+00:00",
+    "category": "Trainer"
+  },
+  {
+    "id": "4ihkm1a1nfgfs4hncjl7ua6id",
+    "name": "Argenta",
+    "name_slug": "argenta",
+    "description": "Teaches Silver-tier Skills",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/3410937ce3479e73649d1b9a651284243ae96ff6@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/aa19497c6cc61e71d8f667f42e3f0a305beff56c@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/3410937ce3479e73649d1b9a651284243ae96ff6@256.webp/encounter?v=2&amp;fg=aa19497c6cc61e71d8f667f42e3f0a305beff56c&amp;sig=QQLx1g5oY%2BzlQ%2Fth18AU60PRxXM%3D",
+    "tier": "Silver",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T18:10:15.275486+00:00",
+    "updated_at": "2026-01-06T18:10:15.275486+00:00",
+    "category": "Trainer"
+  },
+  {
+    "id": "8pv2uzazowfqbjjwrxcr5qqt",
+    "name": "Bjorn",
+    "name_slug": "bjorn",
+    "description": "Teaches Freeze skills",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/5fb7531807626d7a0a1bd47bd2a7629f52ba7fd9@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/56f580140272d64ff74fe9ed47b81600963dac89@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/5fb7531807626d7a0a1bd47bd2a7629f52ba7fd9@256.webp/encounter?v=2&amp;fg=56f580140272d64ff74fe9ed47b81600963dac89&amp;sig=lMm14Ev7SCBTRh75IwiJCjFzDfk%3D",
+    "tier": "Gold",
+    "heroes": [
+      "Dooley",
+      "Mak",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T18:10:36.633989+00:00",
+    "updated_at": "2026-01-06T18:10:36.633989+00:00",
+    "category": "Trainer"
+  },
+  {
+    "id": "50wvzdbgt3zi8bujl5oo6nymy",
+    "name": "C4",
+    "name_slug": "c4",
+    "description": "Teaches Ammo skills",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/9d7e294f0fd25a1c9097844a855f21c26407b549@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/2400ca08fc7368c6a698c3fce61f847c7386e6e0@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/9d7e294f0fd25a1c9097844a855f21c26407b549@256.webp/encounter?v=2&amp;fg=2400ca08fc7368c6a698c3fce61f847c7386e6e0&amp;sig=uYjmadp00x8l7TK4F0t97MUFlAI%3D",
+    "tier": "Gold",
+    "heroes": [
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T18:10:45.465829+00:00",
+    "updated_at": "2026-01-06T18:10:45.465829+00:00",
+    "category": "Trainer"
+  },
+  {
+    "id": "73bzewdba3mnalyrf89kq4r2i",
+    "name": "Cymon",
+    "name_slug": "cymon",
+    "description": "Teaches skills unique to Dooley",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/ceec672be07dc5f1cf90df2e1f9dbf226571a57d@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/d85e21d761e99db164eadbaa7e9580145b398216@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/ceec672be07dc5f1cf90df2e1f9dbf226571a57d@256.webp/encounter?v=2&amp;fg=d85e21d761e99db164eadbaa7e9580145b398216&amp;sig=9Ht%2BUaq%2B8RdTRXGfG%2FPFmEqCrHs%3D",
+    "tier": "Diamond",
+    "heroes": [
+      "Dooley"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T18:10:53.962782+00:00",
+    "updated_at": "2026-01-06T18:10:53.962782+00:00",
+    "category": "Trainer"
+  },
+  {
+    "id": "cj3gve7nxgmmlekqzjfk2t00c",
+    "name": "Fortis",
+    "name_slug": "fortis",
+    "description": "Teaches Shield skills",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/1874f7a813e2baf1ee15bfa47b07395a7b52ede7@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/e723c1697fe4ec0949e633374738444cc28d6612@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/1874f7a813e2baf1ee15bfa47b07395a7b52ede7@256.webp/encounter?v=2&amp;fg=e723c1697fe4ec0949e633374738444cc28d6612&amp;sig=bDFahDfBHullRSiQXs5TGbzgUt4%3D",
+    "tier": "Gold",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Pygmalien",
+      "Jules"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T18:11:02.760594+00:00",
+    "updated_at": "2026-01-06T18:11:02.760594+00:00",
+    "category": "Trainer"
+  },
+  {
+    "id": "2g1lxeo79o2y871q0m678ugsl",
+    "name": "Malafang",
+    "name_slug": "malafang",
+    "description": "Teaches Burn skills",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/3ad1d2c63ac3c0ab40d0bc78a42f8017efb7df62@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/1338e5de8fd0ddd62f63c1092bd12619455713ea@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/3ad1d2c63ac3c0ab40d0bc78a42f8017efb7df62@256.webp/encounter?v=2&amp;fg=1338e5de8fd0ddd62f63c1092bd12619455713ea&amp;sig=txp70ykydL5er4Xo9WevG1Hmrlc%3D",
+    "tier": "Gold",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T18:11:11.54455+00:00",
+    "updated_at": "2026-01-06T18:11:11.54455+00:00",
+    "category": "Trainer"
+  },
+  {
+    "id": "36vtgpz7765gpj0o44houpgau",
+    "name": "Mr. Tuskari",
+    "name_slug": "mr-tuskari",
+    "description": "Teaches skills unique to Pygmalien",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/ed76db5912b1ef819a86b8ee25379bb39a625050@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/f5ee1b84b5b3d3383df6af9fe392c131fc97ac09@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/ed76db5912b1ef819a86b8ee25379bb39a625050@256.webp/encounter?v=2&amp;fg=f5ee1b84b5b3d3383df6af9fe392c131fc97ac09&amp;sig=FYmUQObLJJGf%2BuUf4CTd4GMB7N8%3D",
+    "tier": "Diamond",
+    "heroes": [
+      "Pygmalien"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T18:11:19.541407+00:00",
+    "updated_at": "2026-01-06T18:11:19.541407+00:00",
+    "category": "Trainer"
+  },
+  {
+    "id": "bnliq1fzovt89keaghxdxsz2x",
+    "name": "Nonna",
+    "name_slug": "nonna",
+    "description": "Teaches Jules Skills",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/758180fc6350c27fda48fb6cd7ea9770ba281866@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/2b92e3358a3c3606c5607d44ab3509cef17ff787@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/758180fc6350c27fda48fb6cd7ea9770ba281866@256.webp/encounter?v=2&amp;fg=2b92e3358a3c3606c5607d44ab3509cef17ff787&amp;sig=zGf%2B94siyKFQ0xrhevlz5QUDLxY%3D",
+    "tier": "Diamond",
+    "heroes": [
+      "Jules"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T18:11:32.656989+00:00",
+    "updated_at": "2026-01-06T18:11:32.656989+00:00",
+    "category": "Trainer"
+  },
+  {
+    "id": "1ybz2020hqh0iv802al9bzamh",
+    "name": "Nufu",
+    "name_slug": "nufu",
+    "description": "Sells Skills",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/f5b45b42914a258375f78c3f3afc58e347378c96@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/357320eb0bfd0da4de6f6521d876caef5d6c7c5a@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/f5b45b42914a258375f78c3f3afc58e347378c96@256.webp/encounter?v=2&amp;fg=357320eb0bfd0da4de6f6521d876caef5d6c7c5a&amp;sig=FJ3zTVfriPvotmybw9hM9sq9zzY%3D",
+    "tier": "Gold",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T18:11:44.461096+00:00",
+    "updated_at": "2026-01-06T18:11:44.461096+00:00",
+    "category": "Trainer"
+  },
+  {
+    "id": "7u3scm2v3fjlasqjvo8i3n0ne",
+    "name": "Old Zane",
+    "name_slug": "old-zane",
+    "description": "Teaches skills unique to Vanessa",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/dc3480c7da29945ea5cf9995161445381e850384@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/5d68b664c6b825d280dd1969dbf6068f12be0b8c@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/dc3480c7da29945ea5cf9995161445381e850384@256.webp/encounter?v=2&amp;fg=5d68b664c6b825d280dd1969dbf6068f12be0b8c&amp;sig=xXwr3IhZK2AiEpS%2BQIFANfNiVug%3D",
+    "tier": "Diamond",
+    "heroes": [
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T18:11:54.341791+00:00",
+    "updated_at": "2026-01-06T18:11:54.341791+00:00",
+    "category": "Trainer"
+  },
+  {
+    "id": "9i2i0b7fp2r7heoslgokcu9eg",
+    "name": "Orlin",
+    "name_slug": "orlin",
+    "description": "Teaches Gold-tier Skills",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/3807293e1f6c90d77ca134e53862cb5277989fa1@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/d44584c765553570a07861eecca9c284cb1faad6@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/3807293e1f6c90d77ca134e53862cb5277989fa1@256.webp/encounter?v=2&amp;fg=d44584c765553570a07861eecca9c284cb1faad6&amp;sig=5BvWcgnBxE7M19idOZTs86mBokk%3D",
+    "tier": "Gold",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T18:12:05.794405+00:00",
+    "updated_at": "2026-01-06T18:12:05.794405+00:00",
+    "category": "Trainer"
+  },
+  {
+    "id": "dfrucvk2a3ty2j2kcldcmt9oq",
+    "name": "Pip",
+    "name_slug": "pip",
+    "description": "Gives you 2 Gold and teaches Bronze-tier Skills.",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/910f8b17b0d1345c646fd195d5c7d89f3e45b885@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/4d2c7e36763a9d106c3180770592c1b9682a0c2b@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/910f8b17b0d1345c646fd195d5c7d89f3e45b885@256.webp/encounter?v=2&amp;fg=4d2c7e36763a9d106c3180770592c1b9682a0c2b&amp;sig=ocbPvjRQqRS%2FiStkuosXL1582dM%3D",
+    "tier": "Bronze",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T18:12:19.541242+00:00",
+    "updated_at": "2026-01-06T18:12:19.541242+00:00",
+    "category": "Trainer"
+  },
+  {
+    "id": "eas5rsg1hzw2vgm5e502b2qk8",
+    "name": "Professor Riggle",
+    "name_slug": "professor-riggle",
+    "description": "Teaches Poison skills",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/f436b592a39dcebc3d799d5ae3eb0f1ca3680a70@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/3fc26a1d4a142660f2905a046038ee4cc4f1eef7@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/f436b592a39dcebc3d799d5ae3eb0f1ca3680a70@256.webp/encounter?v=2&amp;fg=3fc26a1d4a142660f2905a046038ee4cc4f1eef7&amp;sig=zfA%2BLl4l0g%2B%2BJ50loWJokbE2yr4%3D",
+    "tier": "Gold",
+    "heroes": [
+      "Dooley",
+      "Mak",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T18:12:29.351182+00:00",
+    "updated_at": "2026-01-06T18:12:29.351182+00:00",
+    "category": "Trainer"
+  },
+  {
+    "id": "aoiyt3gx83fnzqi4oy6lkjxe1",
+    "name": "Regenald",
+    "name_slug": "regenald",
+    "description": "Teaches Health, Heal and Regen skills",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/ca953927fc5ce7ee6c6538766158a7c8d1d9060f@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/d29bf39294f8cbf23af1ee548f40dce2c69c9613@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/ca953927fc5ce7ee6c6538766158a7c8d1d9060f@256.webp/encounter?v=2&amp;fg=d29bf39294f8cbf23af1ee548f40dce2c69c9613&amp;sig=HXp16AcGNEjtP1ACDlpxATDG0FU%3D",
+    "tier": "Gold",
+    "heroes": [
+      "Mak",
+      "Pygmalien",
+      "Jules"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T18:12:37.25221+00:00",
+    "updated_at": "2026-01-06T18:12:37.25221+00:00",
+    "category": "Trainer"
+  },
+  {
+    "id": "bd0tj5cwb8xgooqr9648cmm3t",
+    "name": "Ryukon",
+    "name_slug": "ryukon",
+    "description": "Teaches Weapon Skills",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/fce07b12489b1135656c5d0a09cbbf36cd1f2b10@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/e7e961de2cae443fd901d5adc204a3065587a053@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/fce07b12489b1135656c5d0a09cbbf36cd1f2b10@256.webp/encounter?v=2&amp;fg=e7e961de2cae443fd901d5adc204a3065587a053&amp;sig=O8ITRZFwk1vln5mjVj2uPhW53NA%3D",
+    "tier": "Gold",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T18:12:47.113176+00:00",
+    "updated_at": "2026-01-06T18:12:47.113176+00:00",
+    "category": "Trainer"
+  },
+  {
+    "id": "3o9j4nejc6v4cn48jbs4at4jr",
+    "name": "Uncle Odi",
+    "name_slug": "uncle-odi",
+    "description": "Teaches skills unique to Stelle",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/5b5945b770c93cf0b0e68d6be968a1db58947e93@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/08a01cd6689f6565e3b0a207ce9b416fe038e824@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/5b5945b770c93cf0b0e68d6be968a1db58947e93@256.webp/encounter?v=2&amp;fg=08a01cd6689f6565e3b0a207ce9b416fe038e824&amp;sig=v4J%2BTcY3Js447AD%2FP%2FosvlNQtzs%3D",
+    "tier": "Diamond",
+    "heroes": [
+      "Stelle"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T18:13:03.346091+00:00",
+    "updated_at": "2026-01-06T18:13:03.346091+00:00",
+    "category": "Trainer"
+  },
+  {
+    "id": "8nj3nnoo91wcbo1xjl8jk1aoz",
+    "name": "Vermir",
+    "name_slug": "vermir",
+    "description": "Teaches Crit skills",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/c34510b64e60a6c70e6764988bb5876a3b3f75b8@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/ab9bc7f7cfa16948b812ade66be33553cf2eabcf@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/c34510b64e60a6c70e6764988bb5876a3b3f75b8@256.webp/encounter?v=2&amp;fg=ab9bc7f7cfa16948b812ade66be33553cf2eabcf&amp;sig=GK0ni9g8CKaDqqHDu0wXyUES1g0%3D",
+    "tier": "Gold",
+    "heroes": [
+      "Dooley",
+      "Mak",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T18:13:10.855983+00:00",
+    "updated_at": "2026-01-06T18:13:10.855983+00:00",
+    "category": "Trainer"
+  },
+  {
+    "id": "1h7udrtkis6vzzval6huylfba",
+    "name": "Slohmor Lumbra",
+    "name_slug": "slohmor-lumbra",
+    "description": "Teaches Slow skills",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/859a378338240c1ac11288593295e53f5b05f0b3@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/54085cb9985c28fe3848ba06ec55009cd8ccd7c4@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/859a378338240c1ac11288593295e53f5b05f0b3@256.webp/encounter?v=2&amp;fg=54085cb9985c28fe3848ba06ec55009cd8ccd7c4&amp;sig=A4HXSdHgAUX9EEGcZPWn3FzvhQM%3D",
+    "tier": "Gold",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T18:12:55.68313+00:00",
+    "updated_at": "2026-01-06T18:12:55.68313+00:00",
+    "category": "Trainer"
+  },
+  {
+    "id": "7ysmqdhtjj15rrehab58vycmy",
+    "name": "Zara",
+    "name_slug": "zara",
+    "description": "Teaches Haste and Charge skills",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/87726ab4b2bcc34b08bcd1d1f57b374631a386e9@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/ebd3faddf052a1a57287412170d2180c25c3dbe7@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/87726ab4b2bcc34b08bcd1d1f57b374631a386e9@256.webp/encounter?v=2&amp;fg=ebd3faddf052a1a57287412170d2180c25c3dbe7&amp;sig=xpH0loM7NWuqkjM0Avj4R%2FzvmWQ%3D",
+    "tier": "Gold",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T18:13:19.749643+00:00",
+    "updated_at": "2026-01-06T18:13:19.749643+00:00",
+    "category": "Trainer"
+  },
+  {
+    "id": "bb6jrau48iz1ufth1d6yysnn",
+    "name": "Zosima",
+    "name_slug": "zosima",
+    "description": "Teaches skills unique to Mak",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/43323774d9c29980c4e62b4bf634375a27a26cb4@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/b450c50ce1ead6219ef5695b055f14ad36f9349e@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/43323774d9c29980c4e62b4bf634375a27a26cb4@256.webp/encounter?v=2&amp;fg=b450c50ce1ead6219ef5695b055f14ad36f9349e&amp;sig=6P1ACWGNSgFj2t2iszhZ6FdrdEc%3D",
+    "tier": "Diamond",
+    "heroes": [
+      "Mak"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T18:13:32.761735+00:00",
+    "updated_at": "2026-01-06T18:13:32.761735+00:00",
+    "category": "Trainer"
+  },
+  {
+    "id": "awdgzhith7lcx71o2k4vzki3h",
+    "name": "Zurphin's Safari",
+    "name_slug": "zurphin-s-safari",
+    "description": "Sells Monster Skills",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/ad9b50ae549842c7dda7e3d1709130eb342f49a3@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/7dbef8fa3b04d8f54d66c2a9a3f0c807faa58670@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/ad9b50ae549842c7dda7e3d1709130eb342f49a3@256.webp/encounter?v=2&amp;fg=7dbef8fa3b04d8f54d66c2a9a3f0c807faa58670&amp;sig=1Dr0EsPfPhXX3lPJOzAxnJsh1j4%3D",
+    "tier": "Diamond",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T18:13:41.178546+00:00",
+    "updated_at": "2026-01-06T18:13:41.178546+00:00",
+    "category": "Trainer"
+  },
+  {
+    "id": "7xacpshl3duvuizj866lqogff",
+    "name": "Jay Jay",
+    "name_slug": "jay-jay",
+    "description": "Sells items.",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/8c6f5bf738b08b08f8ca55bf96eb979c83305ece@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/edf2d97b9529c99ef04135a51823ddac7d7d7bd3@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/8c6f5bf738b08b08f8ca55bf96eb979c83305ece@256.webp/encounter?v=2&amp;fg=edf2d97b9529c99ef04135a51823ddac7d7d7bd3&amp;sig=LIMvx%2BE5Bk%2FAeqHuQ1DMhKs4C4c%3D",
+    "tier": "Bronze",
+    "heroes": [
+      "Stelle",
+      "Dooley",
+      "Mak",
+      "Pygmalien",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-06T16:28:34.069743+00:00",
+    "updated_at": "2026-01-06T16:28:34.069743+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "7ucrgktgeo1eun08e5z7uz336",
+    "name": "Aero",
+    "name_slug": "aero",
+    "description": "Sells Vehicles",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/094cbb1dfe035309f145252cfb7b7edf4c09f150@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/a66724e99d779348c36871d3f025366e0d8252f3@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/094cbb1dfe035309f145252cfb7b7edf4c09f150@256.webp/encounter?v=2&amp;fg=a66724e99d779348c36871d3f025366e0d8252f3&amp;sig=Nt%2Fs0L1sbkGVV0lcVt1SzOh7pvE%3D",
+    "tier": "Gold",
+    "heroes": [
+      "Stelle"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-07T04:54:33.846411+00:00",
+    "updated_at": "2026-01-07T04:54:33.846411+00:00",
+    "category": "Merchant"
+  },
+  {
+    "id": "ec63s28mx7j9lfrw0qpwxcl7o",
+    "name": "Aimbot",
+    "name_slug": "aimbot",
+    "description": "Sells Crit items from any Hero",
+    "image_url": "https://s.bazaardb.gg/v0/z9.0a/encounter/a5a6258c0246bcf43df269a3ed90339f1fb90d54@400.webp",
+    "image_url_fg": "https://s.bazaardb.gg/v0/z9.0a/encounter/12047460c0176a872fcb7673cac0ba90c6e755c5@400.webp?v=2",
+    "image_url_large": "https://i.bazaardb.gg/v0/z9.0a/encounter/a5a6258c0246bcf43df269a3ed90339f1fb90d54@256.webp/encounter?v=2&amp;fg=12047460c0176a872fcb7673cac0ba90c6e755c5&amp;sig=0BBx8%2FllXRrel4TeLs5FHoEp0VU%3D",
+    "tier": "Silver",
+    "heroes": [
+      "Dooley",
+      "Mak",
+      "Jules",
+      "Vanessa"
+    ],
+    "type": "EventEncounter",
+    "created_at": "2026-01-07T04:54:52.04723+00:00",
+    "updated_at": "2026-01-07T04:54:52.04723+00:00",
+    "category": "Merchant"
+  }
+]

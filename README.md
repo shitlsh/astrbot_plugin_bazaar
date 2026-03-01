@@ -65,6 +65,7 @@ BazaarForge 提供结构化的阵容数据（包含胜场、胜利类型、等�
 - 按英雄筛选事件：`/tbzsearch hero:Jules` 可过滤该英雄相关事件
 - 通过物品名查询社区推荐阵容（BazaarForge + bazaar-builds.net 双数据源）
 - 英雄物品评级（Tier List）：按使用率 S/A/B/C 分级，图片卡片展示
+- 商人/训练师查询：67 个 NPC 数据，支持按名称或关键词搜索
 - API 响应缓存：减少重复请求，提升响应速度
 - 别名系统：支持社区昵称映射，可通过 AstrBot 管理面板或命令管理
 - 在线数据更新：一键从 BazaarHelper 仓库拉取最新数据
@@ -117,6 +118,7 @@ sudo yum install wqy-zenhei-fonts
 | `/tbznews [数量]` | 查询游戏官方更新公告（图片） | `/tbznews` 或 `/tbznews 3` |
 | `/tbzbuild <物品名> [数量]` | 查询推荐阵容 | `/tbzbuild 符文匕首 5` |
 | `/tbztier <英雄名>` | 查询英雄物品评级（Tier List） | `/tbztier 海盗` |
+| `/tbzmerchant <名称>` | 查询商人/训练师信息 | `/tbzmerchant Aila` |
 | `/tbzalias` | 别名管理 | `/tbzalias list hero` |
 | `/tbzupdate` | 从远端更新游戏数据 | `/tbzupdate` |
 
@@ -175,7 +177,7 @@ sudo yum install wqy-zenhei-fonts
 
 ## AI 工具集成
 
-插件注册了 9 个 AI 工具（`@llm_tool`），当 AstrBot 配置了支持函数调用的 LLM 后，AI 可以在对话中自动调用这些功能，无需用户手动输入指令：
+插件注册了 10 个 AI 工具（`@llm_tool`），当 AstrBot 配置了支持函数调用的 LLM 后，AI 可以在对话中自动调用这些功能，无需用户手动输入指令：
 
 | 工具名 | 功能 | 触发场景示例 |
 |--------|------|-------------|
@@ -187,6 +189,7 @@ sudo yum install wqy-zenhei-fonts
 | `bazaar_query_build` | 查询推荐阵容 | "海盗船锚怎么搭配？" |
 | `bazaar_get_news` | 查询更新公告 | "最近更新了什么？" |
 | `bazaar_query_tierlist` | 查询英雄物品评级 | "海盗哪些物品好用？" |
+| `bazaar_query_merchant` | 查询商人/训练师 | "谁卖武器？" |
 
 AI 会根据用户的自然语言自动选择合适的工具调用，并将结果整合到回复中。
 

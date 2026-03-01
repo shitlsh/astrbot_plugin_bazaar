@@ -604,14 +604,16 @@ class BazaarPlugin(Star):
             "- bazaar_search: 多条件搜索物品/怪物/技能/事件\n"
             "- bazaar_query_build: 查询社区推荐阵容（来自 BazaarForge 和 bazaar-builds.net）\n"
             "- bazaar_get_news: 查询游戏最近的更新公告/补丁说明\n"
-            "- bazaar_query_tierlist: 查询英雄物品评级（Tier List，各物品使用率排名）\n\n"
+            "- bazaar_query_tierlist: 查询英雄物品评级（Tier List，各物品使用率排名）\n"
+            "- bazaar_query_merchant: 查询商人/训练师信息（出售内容、品质、可遇到英雄）\n\n"
             "重要规则：\n"
             "- 当用户提到任何可能是游戏内容的名词时（如物品名、怪物名、英雄名），优先使用工具查询，不要凭空编造信息\n"
             "- 当用户问「怎么搭配」「怎么玩」「推荐阵容」时，使用 bazaar_query_build 工具\n"
             "- 当用户问某个东西「是什么」「有什么效果」时，先用 bazaar_query_item 查询\n"
             "- 当用户问「最近更新了什么」「有什么新补丁」「更新公告」时，使用 bazaar_get_news 工具\n"
             "- 当用户问「哪些物品好用」「物品推荐」「装备排名」「tier list」时，使用 bazaar_query_tierlist 工具\n"
-            "- 工具返回的是纯文本信息。如果用户想看图片卡片，建议他们使用 /tbzitem、/tbzmonster、/tbzskill、/tbztier 等命令\n"
+            "- 当用户问「商人」「在哪买」「训练师」「谁卖武器」等问题时，使用 bazaar_query_merchant 工具\n"
+            "- 工具返回的是纯文本信息。如果用户想看图片卡片，建议他们使用 /tbzitem、/tbzmonster、/tbzskill、/tbztier、/tbzmerchant 等命令\n"
             "- 在回复中整合工具返回的数据，并在末尾告知用户可以使用对应命令查看图片版本\n"
             "- 用中文回复玩家，语气友好专业\n"
             "- 游戏中的英雄包括：Dooley(杜利/鸡煲)、Jules(朱尔斯/厨子)、Mak(马克)、Pygmalien(皮格马利翁/猪猪)、Stelle(斯黛拉/黑妹)、Vanessa(瓦妮莎/海盗) 等\n"
@@ -631,6 +633,7 @@ class BazaarPlugin(Star):
             "bazaar_query_build",
             "bazaar_get_news",
             "bazaar_query_tierlist",
+            "bazaar_query_merchant",
         ]
         try:
             pm = self.context.persona_manager
@@ -790,6 +793,7 @@ class BazaarPlugin(Star):
             ("items_db.json", "items", []),
             ("skills_db.json", "skills", []),
             ("event_detail.json", "events", []),
+            ("merchants_db.json", "merchants", []),
         ]:
             path = data_dir / name
             try:
@@ -1245,13 +1249,47 @@ class BazaarPlugin(Star):
                 results.append(skill)
         return results
 
+    def _search_merchants(self, keyword: str) -> list:
+        results = []
+        kw = keyword.lower()
+        for m in self.merchants:
+            if (kw in m.get("name", "").lower() or
+                kw in m.get("description", "").lower() or
+                kw in m.get("category", "").lower() or
+                kw in m.get("tier", "").lower() or
+                any(kw in h.lower() for h in m.get("heroes", []))):
+                results.append(m)
+        return results
+
+    def _format_merchant_info(self, merchant: dict) -> str:
+        name = merchant.get("name", "")
+        desc = merchant.get("description", "")
+        category = merchant.get("category", "")
+        tier = merchant.get("tier", "")
+        heroes = merchant.get("heroes", [])
+        category_cn = "商人" if category == "Merchant" else "训练师" if category == "Trainer" else category
+        tier_cn = {"Bronze": "青铜", "Silver": "白银", "Gold": "黄金", "Diamond": "钻石", "Legendary": "传说"}.get(tier, tier)
+        heroes_cn = [f"{HERO_CN_MAP.get(h, h)}" for h in heroes]
+        lines = [
+            f"🏪 {name}",
+            f"━━━━━━━━━━━━━━━━━━",
+            f"📋 类型: {category_cn}",
+            f"💎 品质: {tier_cn}({tier})",
+            f"📝 描述: {desc}",
+            f"👥 可用英雄: {' | '.join(heroes_cn)}",
+        ]
+        slug = merchant.get("name_slug", "")
+        if slug:
+            lines.append(f"🔗 https://bazaarforge.gg/merchants/{slug}")
+        return "\n".join(lines)
+
     @filter.command("tbzhelp")
     async def cmd_help(self, event: AstrMessageEvent):
         """查看 Bazaar 插件帮助信息"""
         help_text = (
             "🎮 The Bazaar 数据查询助手\n"
             "━━━━━━━━━━━━━━━━━━\n"
-            f"📊 数据: {len(self.monsters)}怪物 | {len(self.items)}物品 | {len(self.skills)}技能 | {len(self.events)}事件\n\n"
+            f"📊 数据: {len(self.monsters)}怪物 | {len(self.items)}物品 | {len(self.skills)}技能 | {len(self.events)}事件 | {len(self.merchants)}商人\n\n"
             "📋 可用指令:\n\n"
             "/tbzmonster <名称> - 查询怪物详情(图片卡片)\n"
             "  示例: /tbzmonster 火灵\n\n"
@@ -1273,6 +1311,8 @@ class BazaarPlugin(Star):
             "  示例: /tbzbuild 符文匕首\n\n"
             "/tbztier <英雄名> - 查询英雄物品评级(Tier List)\n"
             "  示例: /tbztier 海盗 或 /tbztier Vanessa\n\n"
+            "/tbzmerchant <名称> - 查询商人/训练师信息\n"
+            "  示例: /tbzmerchant Aila 或 /tbzmerchant Weapon\n\n"
             "/tbzalias - 别名管理(查看/添加/删除)\n"
             "  查看: /tbzalias list [分类]\n"
             "  添加: /tbzalias add hero 猪猪 Pygmalien\n"
@@ -1744,12 +1784,13 @@ class BazaarPlugin(Star):
     @filter.command("tbzupdate")
     async def cmd_update(self, event: AstrMessageEvent):
         """从远端更新游戏数据"""
-        yield event.plain_result("⏳ 正在从 BazaarHelper 仓库下载最新数据...")
+        yield event.plain_result("⏳ 正在从 BazaarHelper 仓库和 BazaarForge 下载最新数据...")
 
         data_dir = self.plugin_dir / "data"
         session = await self._get_session()
         results = []
         success_count = 0
+        total_sources = len(DATA_FILES) + 1
 
         for filename, url in DATA_FILES.items():
             try:
@@ -1770,14 +1811,31 @@ class BazaarPlugin(Star):
             except Exception as e:
                 results.append(f"❌ {filename}: {e}")
 
+        try:
+            forge_url = f"{FORGE_SUPABASE_URL}/rest/v1/merchants"
+            params = {"select": "*", "limit": "200"}
+            async with session.get(forge_url, params=params, headers=FORGE_HEADERS) as resp:
+                if resp.status == 200:
+                    merchants_data = await resp.json()
+                    filepath = data_dir / "merchants_db.json"
+                    with open(filepath, "w", encoding="utf-8") as f:
+                        json.dump(merchants_data, f, ensure_ascii=False, indent=2)
+                    results.append(f"✅ merchants_db.json: {len(merchants_data)}条数据 (BazaarForge)")
+                    success_count += 1
+                else:
+                    results.append(f"❌ merchants_db.json: HTTP {resp.status}")
+        except Exception as e:
+            results.append(f"❌ merchants_db.json: {e}")
+
         if success_count > 0:
             self._load_data()
             self._build_vocab()
 
         summary = (
-            f"📦 数据更新完成 ({success_count}/{len(DATA_FILES)})\n"
+            f"📦 数据更新完成 ({success_count}/{total_sources})\n"
             + "\n".join(results) + "\n\n"
-            f"📊 当前数据: {len(self.monsters)}怪物 | {len(self.items)}物品 | {len(self.skills)}技能 | {len(self.events)}事件"
+            f"📊 当前数据: {len(self.monsters)}怪物 | {len(self.items)}物品 | {len(self.skills)}技能 | "
+            f"{len(self.events)}事件 | {len(self.merchants)}商人"
         )
         yield event.plain_result(summary)
 
@@ -2498,6 +2556,100 @@ class BazaarPlugin(Star):
         lines.append(f"\n数据来源: BazaarForge.gg")
         lines.append(f"💡 使用 /tbztier {hero_name} 查看图片版评级")
         yield event.plain_result("\n".join(lines))
+
+    @filter.command("tbzmerchant")
+    async def cmd_merchant(self, event: AstrMessageEvent):
+        """查询商人/训练师信息"""
+        if not self.merchants:
+            yield event.plain_result(
+                "⚠️ 商人数据尚未加载。请先运行 /tbzupdate 更新数据。"
+            )
+            return
+        query = _extract_query(event.message_str, "tbzmerchant")
+        if not query:
+            merchant_count = len([m for m in self.merchants if m.get("category") == "Merchant"])
+            trainer_count = len([m for m in self.merchants if m.get("category") == "Trainer"])
+            yield event.plain_result(
+                f"请输入商人名称查询，例如:\n"
+                f"  /tbzmerchant Aila\n"
+                f"  /tbzmerchant Chronos\n\n"
+                f"📊 当前数据: {merchant_count}个商人 | {trainer_count}个训练师\n\n"
+                f"💡 也可按条件搜索:\n"
+                f"  /tbzmerchant Weapon (搜索卖武器的商人)\n"
+                f"  /tbzmerchant Diamond (搜索钻石品质商人)\n"
+                f"  /tbzmerchant Vanessa (搜索某英雄可遇到的商人)"
+            )
+            return
+
+        query = self._resolve_alias(query)
+        kw = query.lower()
+        found = None
+
+        for m in self.merchants:
+            if m.get("name", "").lower() == kw:
+                found = m
+                break
+
+        if not found:
+            results = self._search_merchants(query)
+            def merchant_name(r):
+                cat_cn = "商人" if r.get("category") == "Merchant" else "训练师"
+                return f"{r.get('name', '')} ({cat_cn}/{r.get('tier', '')})"
+            found, msg = _resolve_search(
+                results, query, merchant_name,
+                f"未找到商人「{query}」。"
+            )
+            if msg:
+                yield event.plain_result(msg)
+                return
+
+        if self.renderer:
+            try:
+                img_bytes = await self.renderer.render_merchant_card(found)
+                yield event.chain_result([Comp.Image.fromBytes(img_bytes)])
+                return
+            except Exception as e:
+                logger.warning(f"商人卡片渲染失败，回退文本: {e}")
+        yield event.plain_result(self._format_merchant_info(found))
+
+    @filter.llm_tool(name="bazaar_query_merchant")
+    async def tool_query_merchant(self, event: AstrMessageEvent, merchant_name: str):
+        '''查询 The Bazaar 游戏中的商人或训练师信息，包括出售/教授内容、品质等级和可遇到的英雄。当用户询问商人、NPC、在哪买东西、训练师等问题时使用此工具。
+
+        Args:
+            merchant_name(string): 商人名称或搜索关键词，例如：Aila、Weapon、Diamond
+        '''
+        if not self.merchants:
+            yield event.plain_result("商人数据尚未加载，请先运行 /tbzupdate 更新数据。")
+            return
+        query = self._resolve_alias(merchant_name)
+        kw = query.lower()
+        found = None
+
+        for m in self.merchants:
+            if m.get("name", "").lower() == kw:
+                found = m
+                break
+
+        if not found:
+            results = self._search_merchants(query)
+            if len(results) == 1:
+                found = results[0]
+            elif len(results) > 1:
+                lines = [f"找到 {len(results)} 个相关商人:"]
+                for m in results[:10]:
+                    cat_cn = "商人" if m.get("category") == "Merchant" else "训练师"
+                    lines.append(f"  {m.get('name', '')} ({cat_cn}/{m.get('tier', '')}) - {m.get('description', '')}")
+                if len(results) > 10:
+                    lines.append(f"  ... 还有 {len(results) - 10} 个")
+                lines.append(f"\n💡 使用 /tbzmerchant <名称> 查看详情")
+                yield event.plain_result("\n".join(lines))
+                return
+            else:
+                yield event.plain_result(f"未找到商人「{merchant_name}」。")
+                return
+
+        yield event.plain_result(self._format_merchant_info(found))
 
     async def terminate(self):
         if self._session and not self._session.closed:

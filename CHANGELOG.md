@@ -16,12 +16,19 @@
   - 自动匹配中文物品名（与 BazaarHelper 数据关联）
   - 支持中文英雄名和别名（如「海盗」→Vanessa）
 - 新增 `bazaar_query_tierlist` AI 工具：LLM 可自动查询英雄物品评级
+- 新增 `/tbzmerchant <名称>` 命令：查询商人和训练师信息
+  - 从 BazaarForge 获取 67 个商人/训练师数据（含出售内容、品质、可遇到英雄）
+  - 渲染为图片卡片（商人头像、品质徽章、描述、可用英雄）
+  - 支持按名称精确查询或按关键词模糊搜索（如 Weapon、Diamond、英雄名）
+  - `/tbzupdate` 同步更新商人数据
+- 新增 `bazaar_query_merchant` AI 工具：LLM 可自动查询商人/训练师信息
 - API 响应缓存：新增 TTL 内存缓存层，减少重复 API 请求
   - 阵容缓存 12 小时、Tier List 缓存 12 小时、Steam 新闻 30 分钟、物品 UUID 映射 60 分钟
 
 ### Improvements
 
-- AI 人格预设增强：新增 tierlist 工具说明和触发场景，工具绑定增至 9 个
+- AI 人格预设增强：新增 tierlist/merchant 工具说明和触发场景，工具绑定增至 10 个
+- Tier List 卡片物品缩略图尺寸现在按物品实际大小（Small/Medium/Large）显示不同宽度
 - 阵容查询结果显示数据来源和结构化信息（胜场、胜利类型、等级、血量）
 - `/tbzhelp` 新增 `/tbztier` 命令说明，数据来源新增 BazaarForge
 - `bazaar_query_build` 工具描述更新，说明双数据源查询

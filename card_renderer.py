@@ -41,6 +41,7 @@ TIER_COLORS = {
     "Silver": COLORS["tier_silver"],
     "Gold": COLORS["tier_gold"],
     "Diamond": COLORS["tier_diamond"],
+    "Legendary": (255, 165, 0),
 }
 
 SCALE = 2
@@ -843,10 +844,16 @@ class CardRenderer:
             "Legendary": (255, 121, 198),
         }
 
-        thumb_s = 80 * SCALE
+        thumb_h = 80 * SCALE
+        size_widths = {
+            "Small": int(thumb_h * 0.55),
+            "Medium": thumb_h,
+            "Large": int(thumb_h * 1.45),
+        }
         thumb_gap = 6 * SCALE
         label_w = 60 * SCALE
         row_pad = 8 * SCALE
+        border_w = 2 * SCALE
 
         all_items = []
         for grade in ["S", "A", "B", "C"]:
@@ -868,17 +875,37 @@ class CardRenderer:
                     fetched[key] = result
 
         content_x = label_w + row_pad
-        items_per_row = max(1, (BUILD_CARD_WIDTH - content_x - PADDING) // (thumb_s + thumb_gap))
-        card_width = content_x + items_per_row * (thumb_s + thumb_gap) + PADDING
+        avail_w = BUILD_CARD_WIDTH - content_x - PADDING
+        card_width = BUILD_CARD_WIDTH
+
+        def _layout_rows(items_list):
+            rows = []
+            row = []
+            row_w = 0
+            for it in items_list:
+                tw = size_widths.get(it.get("size", "Medium"), thumb_h)
+                needed = tw + thumb_gap
+                if row and row_w + needed > avail_w:
+                    rows.append(row)
+                    row = [it]
+                    row_w = needed
+                else:
+                    row.append(it)
+                    row_w += needed
+            if row:
+                rows.append(row)
+            return rows
 
         header_h = 70 * SCALE
         body_h = 0
+        grade_rows = {}
         for grade in ["S", "A", "B", "C"]:
             items = tier_items.get(grade, [])
             if not items:
                 continue
-            n_rows = (len(items) + items_per_row - 1) // items_per_row
-            row_h = n_rows * (thumb_s + thumb_gap) + row_pad * 2
+            rows = _layout_rows(items)
+            grade_rows[grade] = rows
+            row_h = len(rows) * (thumb_h + thumb_gap) + row_pad * 2
             body_h += row_h + 2 * SCALE
 
         footer_h = LINE_HEIGHT_LINK * 2 + PADDING
@@ -896,13 +923,13 @@ class CardRenderer:
         y = header_h + PADDING + SECTION_GAP
 
         for grade in ["S", "A", "B", "C"]:
-            items = tier_items.get(grade, [])
-            if not items:
+            if grade not in grade_rows:
                 continue
+            rows = grade_rows[grade]
+            items = tier_items[grade]
 
             color = grade_colors.get(grade, COLORS["text"])
-            n_rows = (len(items) + items_per_row - 1) // items_per_row
-            row_h = n_rows * (thumb_s + thumb_gap) + row_pad * 2
+            row_h = len(rows) * (thumb_h + thumb_gap) + row_pad * 2
 
             draw.rounded_rectangle(
                 (0, y, label_w, y + row_h),
@@ -921,41 +948,42 @@ class CardRenderer:
                 fill=(50, 52, 65)
             )
 
-            ix = content_x
             iy = y + row_pad
-            for idx, it in enumerate(items):
-                if idx > 0 and idx % items_per_row == 0:
-                    ix = content_x
-                    iy += thumb_s + thumb_gap
+            for row in rows:
+                ix = content_x
+                for it in row:
+                    tw = size_widths.get(it.get("size", "Medium"), thumb_h)
 
-                border_color = tier_border_colors.get(it.get("tier", ""), COLORS["text_dim"])
-                draw.rounded_rectangle(
-                    (ix - 2 * SCALE, iy - 2 * SCALE, ix + thumb_s + 2 * SCALE, iy + thumb_s + 2 * SCALE),
-                    radius=4 * SCALE, fill=border_color
-                )
+                    border_color = tier_border_colors.get(it.get("tier", ""), COLORS["text_dim"])
+                    draw.rounded_rectangle(
+                        (ix - border_w, iy - border_w, ix + tw + border_w, iy + thumb_h + border_w),
+                        radius=4 * SCALE, fill=border_color
+                    )
 
-                item_img = fetched.get(it.get("_img_key", ""))
-                if item_img:
-                    resized = item_img.resize((thumb_s, thumb_s), Image.LANCZOS)
-                    img.paste(resized, (ix, iy), resized if resized.mode == "RGBA" else None)
-                else:
-                    draw.rectangle((ix, iy, ix + thumb_s, iy + thumb_s), fill=(60, 63, 80))
-                    name_short = (it.get("name_cn") or it["name"])[:4]
-                    draw.text((ix + 4 * SCALE, iy + thumb_s // 2 - 8 * SCALE), name_short, font=font_small, fill=COLORS["text"])
+                    item_img = fetched.get(it.get("_img_key", ""))
+                    if item_img:
+                        resized = item_img.resize((tw, thumb_h), Image.LANCZOS)
+                        img.paste(resized, (ix, iy), resized if resized.mode == "RGBA" else None)
+                    else:
+                        draw.rectangle((ix, iy, ix + tw, iy + thumb_h), fill=(60, 63, 80))
+                        name_short = (it.get("name_cn") or it["name"])[:3]
+                        draw.text((ix + 2 * SCALE, iy + thumb_h // 2 - 8 * SCALE), name_short, font=font_small, fill=COLORS["text"])
 
-                pct_text = f"{it['pct']:.0f}%"
-                pct_bbox = font_pct.getbbox(pct_text)
-                pw = pct_bbox[2] - pct_bbox[0]
-                ph = pct_bbox[3] - pct_bbox[1]
-                pct_bg_x = ix + thumb_s - pw - 6 * SCALE
-                pct_bg_y = iy + thumb_s - ph - 6 * SCALE
-                draw.rounded_rectangle(
-                    (pct_bg_x - 2 * SCALE, pct_bg_y - 2 * SCALE, pct_bg_x + pw + 4 * SCALE, pct_bg_y + ph + 4 * SCALE),
-                    radius=2 * SCALE, fill=(0, 0, 0, 180)
-                )
-                draw.text((pct_bg_x, pct_bg_y), pct_text, font=font_pct, fill=(255, 255, 255))
+                    pct_text = f"{it['pct']:.0f}%"
+                    pct_bbox = font_pct.getbbox(pct_text)
+                    pw = pct_bbox[2] - pct_bbox[0]
+                    ph = pct_bbox[3] - pct_bbox[1]
+                    pct_bg_x = ix + tw - pw - 4 * SCALE
+                    pct_bg_y = iy + thumb_h - ph - 4 * SCALE
+                    draw.rounded_rectangle(
+                        (pct_bg_x - 2 * SCALE, pct_bg_y - 2 * SCALE, pct_bg_x + pw + 4 * SCALE, pct_bg_y + ph + 4 * SCALE),
+                        radius=2 * SCALE, fill=(0, 0, 0, 180)
+                    )
+                    draw.text((pct_bg_x, pct_bg_y), pct_text, font=font_pct, fill=(255, 255, 255))
 
-                ix += thumb_s + thumb_gap
+                    ix += tw + thumb_gap
+
+                iy += thumb_h + thumb_gap
 
             y += row_h + 2 * SCALE
 
@@ -972,6 +1000,87 @@ class CardRenderer:
 
         buf = io.BytesIO()
         img.save(buf, format="PNG")
+        return buf.getvalue()
+
+    async def render_merchant_card(self, merchant: dict) -> bytes:
+        font_title = self._font(FONT_SIZE_TITLE)
+        font_subtitle = self._font(FONT_SIZE_SUBTITLE)
+        font_body = self._font(FONT_SIZE_BODY)
+        font_small = self._font(FONT_SIZE_TAG)
+        font_link = self._font(FONT_SIZE_LINK)
+
+        name = merchant.get("name", "")
+        desc = merchant.get("description", "")
+        category = merchant.get("category", "")
+        tier = merchant.get("tier", "")
+        heroes = merchant.get("heroes", [])
+        slug = merchant.get("name_slug", "")
+
+        category_cn = "商人" if category == "Merchant" else "训练师" if category == "Trainer" else category
+        tier_cn = {"Bronze": "青铜", "Silver": "白银", "Gold": "黄金", "Diamond": "钻石", "Legendary": "传说"}.get(tier, tier)
+        hero_cn_map = {"Common": "通用", "Dooley": "杜利", "Jules": "朱尔斯", "Mak": "马克", "Pygmalien": "皮格马利翁", "Stelle": "斯黛拉", "Vanessa": "瓦妮莎"}
+
+        content_width = CARD_WIDTH - PADDING * 2
+        header_h = THUMB_SIZE + PADDING * 2
+
+        body_lines = []
+        body_lines.append(("📋 类型", category_cn))
+        body_lines.append(("💎 品质", f"{tier_cn}({tier})"))
+        body_lines.append(("📝 描述", desc))
+        heroes_str = " | ".join(hero_cn_map.get(h, h) for h in heroes)
+        body_lines.append(("👥 可用英雄", heroes_str))
+
+        body_h = 0
+        for label, value in body_lines:
+            wrapped = self._wrap_text(f"{label}: {value}", font_body, content_width)
+            body_h += len(wrapped) * LINE_HEIGHT_BODY + SECTION_GAP
+
+        link_h = LINE_HEIGHT_LINK + PADDING if slug else PADDING
+        total_height = header_h + body_h + link_h + PADDING * 2
+
+        img_card = Image.new("RGBA", (CARD_WIDTH, total_height), COLORS["bg"])
+        draw = ImageDraw.Draw(img_card)
+
+        self._draw_rounded_rect(draw, (0, 0, CARD_WIDTH, header_h), HEADER_RADIUS, COLORS["header_bg"])
+
+        thumb_img = None
+        img_url = merchant.get("image_url_fg") or merchant.get("image_url", "")
+        if img_url:
+            thumb_img = await self._fetch_image(img_url)
+        if thumb_img:
+            thumb_img = thumb_img.resize((THUMB_SIZE, THUMB_SIZE), Image.LANCZOS)
+            img_card.paste(thumb_img, (PADDING, PADDING), thumb_img if thumb_img.mode == "RGBA" else None)
+
+        text_x = THUMB_MARGIN + PADDING
+        tier_color = TIER_COLORS.get(tier, COLORS["text"])
+        draw.text((text_x, PADDING + 8 * SCALE), name, font=font_title, fill=COLORS["text"])
+        draw.text((text_x, PADDING + 8 * SCALE + LINE_HEIGHT_TITLE), category_cn, font=font_subtitle, fill=COLORS["text_dim"])
+
+        badge_text = f" {tier_cn} "
+        bbox = font_small.getbbox(badge_text)
+        bw = bbox[2] - bbox[0] + 8 * SCALE
+        badge_y = PADDING + 8 * SCALE + LINE_HEIGHT_TITLE + LINE_HEIGHT_SUBTITLE + 4 * SCALE
+        draw.rounded_rectangle(
+            (text_x, badge_y, text_x + bw, badge_y + LINE_HEIGHT_SMALL),
+            radius=BADGE_RADIUS, fill=tier_color
+        )
+        draw.text((text_x + 4 * SCALE, badge_y + 2 * SCALE), badge_text.strip(), font=font_small, fill=COLORS["bg"])
+
+        y = header_h + PADDING
+        for label, value in body_lines:
+            full_text = f"{label}: {value}"
+            wrapped = self._wrap_text(full_text, font_body, content_width)
+            for line in wrapped:
+                draw.text((PADDING, y), line, font=font_body, fill=COLORS["text"])
+                y += LINE_HEIGHT_BODY
+            y += SECTION_GAP
+
+        if slug:
+            link_url = f"https://bazaarforge.gg/merchants/{slug}"
+            draw.text((PADDING, y), link_url, font=font_link, fill=COLORS["accent"])
+
+        buf = io.BytesIO()
+        img_card.save(buf, format="PNG")
         return buf.getvalue()
 
     async def render_build_card(self, query: str, search_term: str, builds: list) -> bytes:

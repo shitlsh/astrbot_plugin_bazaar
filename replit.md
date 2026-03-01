@@ -8,8 +8,9 @@
 - 958 个物品 (items_db.json)
 - 448 个技能 (skills_db.json)
 - 39 个事件 (event_detail.json + event_encounters.json 英雄/品质增强)
+- 67 个商人/训练师 (merchants_db.json, 45商人+22训练师)
 
-数据来源于 BazaarHelper 项目 `src-tauri/resources/` 目录的本地 JSON 数据库文件。支持通过 `/tbzupdate` 在线更新。
+数据来源于 BazaarHelper 项目 `src-tauri/resources/` 目录的本地 JSON 数据库文件。商人数据来源于 BazaarForge API。支持通过 `/tbzupdate` 在线更新。
 
 ## 项目结构
 ```
@@ -30,6 +31,7 @@
     ├── skills_db.json     # 技能数据库 (448条)
     ├── event_detail.json  # 事件数据库 (39条)
     ├── event_encounters.json # 事件引擎数据 (373条，用于增强event_detail)
+    ├── merchants_db.json  # 商人/训练师数据库 (67条，BazaarForge)
     ├── aliases.json       # 别名配置（向下兼容，无config时使用）
     └── cache/             # 图片缓存目录（自动创建）
 ```
@@ -44,11 +46,12 @@
 - `/tbznews [数量]` - 查询游戏官方更新公告（Steam 中文翻译，图片卡片输出）
 - `/tbzbuild <物品名> [数量]` - 查询推荐阵容（默认5条，最多10条，双数据源，合并转发输出）
 - `/tbztier <英雄名>` - 查询英雄物品评级 Tier List（图片卡片输出，S/A/B/C 分级）
+- `/tbzmerchant <名称>` - 查询商人/训练师信息（图片卡片输出，支持模糊搜索）
 - `/tbzalias` - 别名管理（list/add/del）
 - `/tbzupdate` - 从 BazaarHelper 仓库更新游戏数据
 
 ## AI 工具 (@llm_tool)
-- 9 个 `@filter.llm_tool` 注册到 AstrBot LLM 工具链，AI 对话中自动调用：
+- 10 个 `@filter.llm_tool` 注册到 AstrBot LLM 工具链，AI 对话中自动调用：
   - `bazaar_query_item` — 查询物品详情（参数: item_name）
   - `bazaar_query_monster` — 查询怪物详情（参数: monster_name）
   - `bazaar_query_skill` — 查询技能详情（参数: skill_name）
@@ -57,6 +60,7 @@
   - `bazaar_query_build` — 查询推荐阵容（参数: query, count）
   - `bazaar_get_news` — 查询游戏更新公告（参数: count）
   - `bazaar_query_tierlist` — 查询英雄物品评级（参数: hero_name）
+  - `bazaar_query_merchant` — 查询商人/训练师信息（参数: name）
 - 工具返回纯文本格式（非图片），供 AI 整合到回复中
 - 需要 AstrBot 配置支持函数调用的 LLM 模型才能使用 AI 工具
 
@@ -64,7 +68,7 @@
 - `_register_persona()` 在 `initialize()` 中调用，通过 `self.context.persona_manager` 注册
 - persona_id: `bazaar_helper`，包含游戏背景、英雄列表、工具使用规则的系统提示词
 - begin_dialogs: 2 条开场对话（user/assistant 交替）
-- tools: 绑定 9 个 bazaar_* 工具（含 bazaar_query_tierlist），确保人格模式下优先调用
+- tools: 绑定 10 个 bazaar_* 工具（含 bazaar_query_tierlist, bazaar_query_merchant），确保人格模式下优先调用
 - 幂等注册：已存在则 update_persona，不存在则 create_persona
 
 ## 数据源架构
@@ -113,7 +117,8 @@
 - 品质（Bronze/Silver/Gold/Diamond）使用对应颜色高亮
 - 物品卡片包含：技能、属性、数值(含tier成长)、附魔、任务
 - 新闻卡片：标题+日期+BBCode正文+Steam链接
-- Tier List 卡片：S/A/B/C 彩色分级、使用率百分比、进度条、阵容数
+- Tier List 卡片：S/A/B/C 彩色分级、缩略图网格（按物品尺寸 Small/Medium/Large 不同宽度）、品质边框、使用率叠加
+- 商人卡片：头像、名称、类型、品质徽章、描述、可用英雄、BazaarForge 链接
 - 渲染失败时自动回退到纯文本输出
 - 需要中文字体支持（WenQuanYi Zen Hei）
 
