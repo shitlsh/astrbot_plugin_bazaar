@@ -12,12 +12,12 @@
   - `_conf_schema.json` 新增 `build_source_priority` 配置项（forge_first / wp_first / forge_only / wp_only）
 - 新增 `/tbztier <英雄名>` 命令：查询英雄物品评级（Tier List）
   - 从 BazaarForge 获取物品使用率数据，按 S/A/B/C 分级（S≥15%, A≥8%, B≥3%, C>0%）
-  - 渲染为精美图片卡片（彩色等级标识、使用率百分比、进度条、阵容数）
+  - 渲染为网格式图片卡片（物品缩略图 + 品质边框 + 使用率百分比叠加，各等级横向排布）
   - 自动匹配中文物品名（与 BazaarHelper 数据关联）
   - 支持中文英雄名和别名（如「海盗」→Vanessa）
 - 新增 `bazaar_query_tierlist` AI 工具：LLM 可自动查询英雄物品评级
 - API 响应缓存：新增 TTL 内存缓存层，减少重复 API 请求
-  - 阵容缓存 15 分钟、Tier List 缓存 30 分钟、Steam 新闻 30 分钟、物品 UUID 映射 60 分钟
+  - 阵容缓存 12 小时、Tier List 缓存 12 小时、Steam 新闻 30 分钟、物品 UUID 映射 60 分钟
 
 ### Improvements
 

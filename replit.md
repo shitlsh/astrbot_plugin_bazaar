@@ -84,7 +84,7 @@
 
 ## API 缓存
 - `_cached_request(key, ttl, fetch_fn)` 通用 TTL 内存缓存
-- 阵容: 15分钟、Tier List: 30分钟、Steam新闻: 30分钟、物品UUID映射: 60分钟
+- 阵容: 12小时、Tier List: 12小时、Steam新闻: 30分钟、物品UUID映射: 60分钟
 - 纯内存，不落盘
 
 ## 事件数据增强

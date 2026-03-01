@@ -29,8 +29,8 @@ FORGE_HEADERS = {
 }
 FORGE_BUILD_URL = "https://bazaarforge.gg/builds"
 
-CACHE_TTL_BUILDS = 900
-CACHE_TTL_TIERLIST = 1800
+CACHE_TTL_BUILDS = 43200
+CACHE_TTL_TIERLIST = 43200
 CACHE_TTL_NEWS = 1800
 CACHE_TTL_ITEM_UUID = 3600
 
@@ -461,6 +461,7 @@ class BazaarPlugin(Star):
                 "tier": item.get("starting_tier", ""),
                 "size": item.get("size", ""),
                 "tags": item.get("tags", []),
+                "image_url": item.get("image_url", ""),
             }
             if pct >= TIER_LIST_THRESHOLDS["S"]:
                 tier_items["S"].append(entry)
