@@ -5,8 +5,11 @@ import os
 import re
 import time
 import html as html_module
+from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Callable, TypeVar
+from functools import lru_cache
 
 import aiohttp
 
@@ -14,6 +17,101 @@ from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger, AstrBotConfig
 import astrbot.api.message_components as Comp
+
+T = TypeVar('T')
+
+
+class LRUCache:
+    """线程安全的 LRU 缓存，支持 TTL 过期和内存大小限制"""
+    
+    def __init__(self, max_size: int = 500, max_memory_mb: float = 50.0):
+        self._cache: OrderedDict[str, tuple[float, float, Any]] = OrderedDict()  # key -> (timestamp, ttl, value)
+        self._max_size = max_size
+        self._max_memory = max_memory_mb * 1024 * 1024  # bytes
+        self._current_memory = 0
+        self._hits = 0
+        self._misses = 0
+    
+    def _estimate_size(self, value: Any) -> int:
+        """估算值的内存大小"""
+        if isinstance(value, bytes):
+            return len(value)
+        elif isinstance(value, str):
+            return len(value.encode('utf-8'))
+        elif isinstance(value, (list, dict)):
+            return len(json.dumps(value, ensure_ascii=False).encode('utf-8'))
+        return 1024  # 默认 1KB
+    
+    def get(self, key: str) -> tuple[bool, Any]:
+        """获取缓存值，返回 (是否命中, 值)"""
+        if key not in self._cache:
+            self._misses += 1
+            return False, None
+        
+        timestamp, ttl, value = self._cache[key]
+        if ttl > 0 and (time.time() - timestamp) > ttl:
+            # 过期
+            self._remove(key)
+            self._misses += 1
+            return False, None
+        
+        # 移动到末尾（最近使用）
+        self._cache.move_to_end(key)
+        self._hits += 1
+        return True, value
+    
+    def set(self, key: str, value: Any, ttl: float = 0):
+        """设置缓存值"""
+        size = self._estimate_size(value)
+        
+        # 如果已存在，先移除旧值
+        if key in self._cache:
+            self._remove(key)
+        
+        # 检查是否需要清理
+        while (len(self._cache) >= self._max_size or 
+               (self._max_memory > 0 and self._current_memory + size > self._max_memory)):
+            if not self._cache:
+                break
+            # 移除最旧的
+            oldest_key = next(iter(self._cache))
+            self._remove(oldest_key)
+        
+        self._cache[key] = (time.time(), ttl, value)
+        self._current_memory += size
+    
+    def _remove(self, key: str):
+        """移除缓存项"""
+        if key in self._cache:
+            _, _, value = self._cache.pop(key)
+            self._current_memory -= self._estimate_size(value)
+    
+    def clear(self):
+        """清空缓存"""
+        self._cache.clear()
+        self._current_memory = 0
+    
+    def cleanup_expired(self) -> int:
+        """清理过期项，返回清理数量"""
+        now = time.time()
+        expired = []
+        for key, (timestamp, ttl, _) in self._cache.items():
+            if ttl > 0 and (now - timestamp) > ttl:
+                expired.append(key)
+        for key in expired:
+            self._remove(key)
+        return len(expired)
+    
+    def stats(self) -> dict:
+        """返回缓存统计"""
+        total = self._hits + self._misses
+        return {
+            "size": len(self._cache),
+            "memory_mb": round(self._current_memory / 1024 / 1024, 2),
+            "hits": self._hits,
+            "misses": self._misses,
+            "hit_rate": round(self._hits / total * 100, 1) if total > 0 else 0,
+        }
 
 BUILDS_API = "https://bazaar-builds.net/wp-json/wp/v2"
 DEFAULT_BUILD_COUNT = 5
@@ -30,10 +128,17 @@ FORGE_HEADERS = {
 }
 FORGE_BUILD_URL = "https://bazaarforge.gg/builds"
 
-CACHE_TTL_BUILDS = 43200
-CACHE_TTL_TIERLIST = 43200
-CACHE_TTL_NEWS = 1800
-CACHE_TTL_ITEM_UUID = 3600
+# 缓存 TTL（秒）
+CACHE_TTL_BUILDS = 43200      # 阵容缓存 12 小时
+CACHE_TTL_TIERLIST = 43200    # Tier List 缓存 12 小时
+CACHE_TTL_NEWS = 1800         # 新闻缓存 30 分钟
+CACHE_TTL_ITEM_UUID = 3600    # 物品 UUID 缓存 1 小时
+CACHE_TTL_IMAGE = 86400       # 图片缓存 24 小时
+CACHE_TTL_RENDER = 7200       # 渲染结果缓存 2 小时
+
+# 缓存大小限制
+CACHE_MAX_SIZE = 1000         # 最大缓存条目数
+CACHE_MAX_MEMORY_MB = 100     # 最大内存占用 MB
 
 TIER_LIST_THRESHOLDS = {"S": 15.0, "A": 8.0, "B": 3.0, "C": 0.0}
 
@@ -183,7 +288,7 @@ CONFIG_KEY_MAP = {
 }
 
 
-@register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、事件、阵容、更新公告、物品评级查询，图片卡片展示，AI 人格预设与工具自动调用", "v1.1.1")
+@register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、事件、阵容、更新公告、物品评级查询，图片卡片展示，AI 人格预设与工具自动调用", "v1.1.2")
 class BazaarPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
@@ -192,36 +297,67 @@ class BazaarPlugin(Star):
         self.items = []
         self.skills = []
         self.events = []
+        self.merchants = []
         self.aliases: dict[str, dict[str, str]] = {}
         self._entity_names: set = set()
         self.plugin_dir = Path(os.path.dirname(os.path.abspath(__file__)))
         self.renderer = None
         self._session: aiohttp.ClientSession | None = None
-        self._cache: dict[str, tuple[float, any]] = {}
+        
+        # 从配置读取缓存设置
+        cache_max_size = CACHE_MAX_SIZE
+        cache_max_memory = CACHE_MAX_MEMORY_MB
+        if config:
+            cache_max_size = max(100, min(int(config.get("cache_max_size", CACHE_MAX_SIZE)), 5000))
+            cache_max_memory = max(10, min(int(config.get("cache_max_memory_mb", CACHE_MAX_MEMORY_MB)), 500))
+        
+        # 优化：使用 LRU 缓存替代普通字典
+        self._cache = LRUCache(max_size=cache_max_size, max_memory_mb=cache_max_memory)
+        # 搜索索引
+        self._search_index: dict[str, set[str]] = {}
+        self._index_built = False
+        # 缓存清理计数器
+        self._request_count = 0
+        self._cleanup_interval = 100  # 每 100 次请求清理一次过期缓存
 
     async def _get_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
-            self._session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20))
+            self._session = aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=20),
+                connector=aiohttp.TCPConnector(limit=10, ttl_dns_cache=300)
+            )
         return self._session
 
-    async def _cached_request(self, key: str, ttl: int, fetch_fn):
-        now = time.time()
-        entry = self._cache.get(key)
-        if entry and (now - entry[0]) < ttl:
-            return entry[1]
+    def _maybe_cleanup_cache(self):
+        """定期清理过期缓存"""
+        self._request_count += 1
+        if self._request_count >= self._cleanup_interval:
+            self._request_count = 0
+            cleaned = self._cache.cleanup_expired()
+            if cleaned > 0:
+                logger.debug(f"缓存清理: 移除 {cleaned} 个过期项")
+
+    async def _cached_request(self, key: str, ttl: int, fetch_fn: Callable) -> Any:
+        """优化的缓存请求方法"""
+        self._maybe_cleanup_cache()
+        
+        hit, value = self._cache.get(key)
+        if hit:
+            return value
+        
         data = await fetch_fn()
         if data:
-            self._cache[key] = (now, data)
+            self._cache.set(key, data, ttl)
         return data
 
     def _get_img_cache(self, key: str, ttl: int) -> bytes | None:
-        entry = self._cache.get(key)
-        if entry and (time.time() - entry[0]) < ttl:
-            return entry[1]
-        return None
+        """获取图片/渲染缓存"""
+        hit, value = self._cache.get(key)
+        return value if hit else None
 
-    def _set_img_cache(self, key: str, data: bytes):
-        self._cache[key] = (time.time(), data)
+    def _set_img_cache(self, key: str, data: bytes, ttl: int = CACHE_TTL_RENDER):
+        """设置图片/渲染缓存"""
+        self._cache.set(key, data, ttl)
 
     def _resolve_hero_name(self, query: str) -> str | None:
         ql = query.strip().lower()
@@ -807,6 +943,87 @@ class BazaarPlugin(Star):
             if ne:
                 names.add(ne.lower())
         self._entity_names = names
+        
+        # 构建搜索索引
+        self._build_search_index()
+
+    def _build_search_index(self):
+        """构建倒排搜索索引，加速关键词搜索"""
+        index: dict[str, set[tuple[str, int]]] = {}  # keyword -> set of (type, index)
+        
+        def add_to_index(keyword: str, entity_type: str, entity_index: int):
+            if not keyword or len(keyword) < 2:
+                return
+            kw = keyword.lower()
+            if kw not in index:
+                index[kw] = set()
+            index[kw].add((entity_type, entity_index))
+            # 添加子串索引（用于模糊搜索）
+            if len(kw) >= 3:
+                for i in range(len(kw) - 1):
+                    sub = kw[i:i+2]
+                    if sub not in index:
+                        index[sub] = set()
+                    index[sub].add((entity_type, entity_index))
+        
+        # 索引物品
+        for i, item in enumerate(self.items):
+            add_to_index(item.get("name_cn", ""), "item", i)
+            add_to_index(item.get("name_en", ""), "item", i)
+            for tag in item.get("tags", "").split("|"):
+                for part in tag.strip().split("/"):
+                    add_to_index(part.strip(), "item", i)
+            for tag in item.get("hidden_tags", "").split("|"):
+                for part in tag.strip().split("/"):
+                    add_to_index(part.strip(), "item", i)
+            for hero in item.get("heroes", "").split("/"):
+                add_to_index(hero.strip(), "item", i)
+        
+        # 索引怪物
+        for i, (key, monster) in enumerate(self.monsters.items()):
+            add_to_index(key, "monster", i)
+            add_to_index(monster.get("name", ""), "monster", i)
+            add_to_index(monster.get("name_zh", ""), "monster", i)
+        
+        # 索引技能
+        for i, skill in enumerate(self.skills):
+            add_to_index(skill.get("name_cn", ""), "skill", i)
+            add_to_index(skill.get("name_en", ""), "skill", i)
+            for hero in skill.get("heroes", "").split("/"):
+                add_to_index(hero.strip(), "skill", i)
+        
+        # 索引事件
+        for i, ev in enumerate(self.events):
+            add_to_index(ev.get("name", ""), "event", i)
+            add_to_index(ev.get("name_en", ""), "event", i)
+        
+        self._search_index = index
+        self._index_built = True
+        logger.debug(f"搜索索引构建完成: {len(index)} 个关键词")
+
+    def _search_by_index(self, keyword: str, entity_type: str = None) -> set[tuple[str, int]]:
+        """使用索引快速搜索"""
+        if not self._index_built:
+            return set()
+        
+        kw = keyword.lower()
+        results = set()
+        
+        # 精确匹配
+        if kw in self._search_index:
+            results.update(self._search_index[kw])
+        
+        # 子串匹配（如果精确匹配结果不够）
+        if len(results) < 5 and len(kw) >= 2:
+            for index_key, entries in self._search_index.items():
+                if kw in index_key or index_key in kw:
+                    results.update(entries)
+        
+        # 过滤类型
+        if entity_type:
+            results = {r for r in results if r[0] == entity_type}
+        
+        return results
 
     def _is_entity_name(self, text: str) -> bool:
         tl = text.lower()
@@ -1200,37 +1417,60 @@ class BazaarPlugin(Star):
         return "\n".join(lines)
 
     def _fuzzy_suggest(self, query: str, limit: int = 8) -> list:
+        """优化的模糊搜索建议"""
         kw = query.lower()
         if len(kw) < 2:
             return []
+        
+        # 首先尝试使用索引快速查找
+        if self._index_built:
+            indexed_results = self._search_by_index(kw)
+            if indexed_results:
+                suggestions = []
+                for entity_type, idx in list(indexed_results)[:limit * 2]:
+                    if entity_type == "item" and idx < len(self.items):
+                        item = self.items[idx]
+                        suggestions.append(f"📦 {item.get('name_cn', '')}({item.get('name_en', '')})")
+                    elif entity_type == "monster":
+                        monsters_list = list(self.monsters.items())
+                        if idx < len(monsters_list):
+                            key, m = monsters_list[idx]
+                            suggestions.append(f"🐉 {m.get('name_zh', key)}({m.get('name', '')})")
+                    elif entity_type == "skill" and idx < len(self.skills):
+                        skill = self.skills[idx]
+                        suggestions.append(f"⚡ {skill.get('name_cn', '')}({skill.get('name_en', '')})")
+                    elif entity_type == "event" and idx < len(self.events):
+                        ev = self.events[idx]
+                        suggestions.append(f"🎲 {ev.get('name', '')}({ev.get('name_en', '')})")
+                if suggestions:
+                    return suggestions[:limit]
+        
+        # 回退到传统模糊搜索
         threshold = max(1, len(kw) // 3)
         candidates = []
-        all_entries = []
-        for item in self.items:
-            cn = item.get("name_cn", "")
-            en = item.get("name_en", "")
-            all_entries.append((cn, en, f"📦 {cn}({en})"))
-        for key, monster in self.monsters.items():
-            cn = monster.get("name_zh", key)
-            en = monster.get("name", "")
-            all_entries.append((cn, en, f"🐉 {cn}({en})"))
-        for skill in self.skills:
-            cn = skill.get("name_cn", "")
-            en = skill.get("name_en", "")
-            all_entries.append((cn, en, f"⚡ {cn}({en})"))
-        for ev in self.events:
-            cn = ev.get("name", "")
-            en = ev.get("name_en", "")
-            all_entries.append((cn, en, f"🎲 {cn}({en})"))
-        for cn, en, display in all_entries:
+        
+        # 使用生成器延迟计算
+        def iter_entries():
+            for item in self.items:
+                yield (item.get("name_cn", ""), item.get("name_en", ""), "📦", item)
+            for key, monster in self.monsters.items():
+                yield (monster.get("name_zh", key), monster.get("name", ""), "🐉", monster)
+            for skill in self.skills:
+                yield (skill.get("name_cn", ""), skill.get("name_en", ""), "⚡", skill)
+            for ev in self.events:
+                yield (ev.get("name", ""), ev.get("name_en", ""), "🎲", ev)
+        
+        for cn, en, emoji, _ in iter_entries():
             best_dist = None
             for name in [cn, en]:
                 if not name:
                     continue
                 nl = name.lower()
+                # 快速路径：完全匹配或子串匹配
                 if kw in nl or nl in kw:
                     best_dist = 0
                     break
+                # 长度差异太大则跳过
                 if abs(len(nl) - len(kw)) > threshold:
                     continue
                 dist = _edit_distance(kw, nl)
@@ -1238,7 +1478,9 @@ class BazaarPlugin(Star):
                     if best_dist is None or dist < best_dist:
                         best_dist = dist
             if best_dist is not None:
+                display = f"{emoji} {cn}({en})" if cn and en else f"{emoji} {cn or en}"
                 candidates.append((best_dist, display))
+        
         candidates.sort(key=lambda x: x[0])
         return [c[1] for c in candidates[:limit]]
 
@@ -1391,12 +1633,101 @@ class BazaarPlugin(Star):
             "  添加: /tbzalias add hero 猪猪 Pygmalien\n"
             "  删除: /tbzalias del hero 猪猪\n\n"
             "/tbzupdate - 从远端更新游戏数据\n\n"
+            "/tbzcache - 查看/清理缓存\n"
+            "  /tbzcache stats - 查看缓存统计\n"
+            "  /tbzcache clear - 清理内存缓存\n\n"
             "/tbzhelp - 显示此帮助信息\n"
             "━━━━━━━━━━━━━━━━━━\n"
             "数据来源: BazaarHelper | BazaarForge | bazaar-builds.net | Steam\n\n"
             "💡 AI 工具: 本插件支持 AI 自动调用，需要 AstrBot 配置支持函数调用的 LLM 模型"
         )
         yield event.plain_result(help_text)
+
+    @filter.command("tbzcache")
+    async def cmd_cache(self, event: AstrMessageEvent):
+        """缓存管理命令"""
+        query = _extract_query(event.message_str, "tbzcache")
+        action = query.lower().strip() if query else "stats"
+        
+        if action in ("stats", "status", "info", ""):
+            stats = self._cache.stats()
+            
+            # 统计图片缓存
+            img_cache_count = 0
+            img_cache_size = 0
+            if self.renderer:
+                try:
+                    cache_files = list(self.renderer.cache_dir.glob("*.webp"))
+                    img_cache_count = len(cache_files)
+                    img_cache_size = sum(f.stat().st_size for f in cache_files if f.exists()) / 1024 / 1024
+                except Exception:
+                    pass
+            
+            lines = [
+                "📊 缓存状态统计",
+                "━━━━━━━━━━━━━━━━━━",
+                "",
+                "【内存缓存】",
+                f"  缓存条目: {stats['size']}",
+                f"  内存占用: {stats['memory_mb']:.2f} MB",
+                f"  命中次数: {stats['hits']}",
+                f"  未命中数: {stats['misses']}",
+                f"  命中率: {stats['hit_rate']}%",
+                "",
+                "【图片缓存】",
+                f"  文件数量: {img_cache_count}",
+                f"  磁盘占用: {img_cache_size:.2f} MB",
+                "",
+                "【搜索索引】",
+                f"  索引关键词: {len(self._search_index)}",
+                f"  索引状态: {'已构建' if self._index_built else '未构建'}",
+                "",
+                "💡 使用 /tbzcache clear 清理内存缓存",
+            ]
+            yield event.plain_result("\n".join(lines))
+            return
+        
+        if action in ("clear", "clean", "reset"):
+            # 清理内存缓存
+            old_stats = self._cache.stats()
+            self._cache.clear()
+            
+            # 清理渲染器内存缓存
+            if self.renderer:
+                self.renderer.clear_memory_cache()
+            
+            yield event.plain_result(
+                f"✅ 缓存已清理\n"
+                f"释放条目: {old_stats['size']}\n"
+                f"释放内存: {old_stats['memory_mb']:.2f} MB"
+            )
+            return
+        
+        if action in ("clearimg", "clearimages", "清理图片"):
+            # 清理图片缓存
+            if self.renderer:
+                try:
+                    cache_files = list(self.renderer.cache_dir.glob("*.webp"))
+                    count = len(cache_files)
+                    size = sum(f.stat().st_size for f in cache_files if f.exists()) / 1024 / 1024
+                    for f in cache_files:
+                        try:
+                            f.unlink()
+                        except OSError:
+                            pass
+                    yield event.plain_result(f"✅ 图片缓存已清理\n删除文件: {count}\n释放空间: {size:.2f} MB")
+                except Exception as e:
+                    yield event.plain_result(f"❌ 清理图片缓存失败: {e}")
+            else:
+                yield event.plain_result("❌ 渲染器未加载")
+            return
+        
+        yield event.plain_result(
+            "用法: /tbzcache [操作]\n"
+            "  stats - 查看缓存统计（默认）\n"
+            "  clear - 清理内存缓存\n"
+            "  clearimg - 清理图片文件缓存"
+        )
 
     @filter.command("tbzmonster")
     async def cmd_monster(self, event: AstrMessageEvent):

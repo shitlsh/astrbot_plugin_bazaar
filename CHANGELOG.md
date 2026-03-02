@@ -1,5 +1,53 @@
 # Changelog
 
+## v1.1.2
+
+### Performance Optimizations
+
+- **LRU 缓存系统重构**
+  - 实现带 TTL 和内存限制的 LRU 缓存类，替代简单 dict 缓存
+  - 支持自动过期清理和大小限制（默认 1000 条目 / 100MB）
+  - 缓存命中率统计和内存使用监控
+  - 定期清理过期缓存项（每 100 次请求检查一次）
+
+- **搜索索引优化**
+  - 新增倒排搜索索引，加速物品/怪物/技能/事件关键词搜索
+  - 支持子串索引用于模糊搜索
+  - 索引在数据加载时自动构建
+
+- **字体和图片缓存优化**
+  - 字体对象类级别缓存，避免重复加载
+  - 图片内存缓存层（限制 50 张），减少磁盘 I/O
+  - 图片文件缓存自动清理（过期 7 天或超过 500 个文件）
+
+- **渲染输出优化**
+  - PNG 输出使用压缩优化（compress_level=6）
+  - 统一图片保存方法，减少重复代码
+
+- **HTTP 连接优化**
+  - aiohttp 连接池配置（limit=10, ttl_dns_cache=300）
+  - 更合理的超时设置
+
+### New Features
+
+- 新增 `/tbzcache` 命令：缓存管理
+  - `/tbzcache stats` - 查看缓存统计（内存占用、命中率、图片缓存大小等）
+  - `/tbzcache clear` - 清理内存缓存
+  - `/tbzcache clearimg` - 清理图片文件缓存
+
+### Configuration
+
+- 新增缓存配置选项：
+  - `cache_max_size`: 内存缓存最大条目数（默认 1000）
+  - `cache_max_memory_mb`: 内存缓存最大占用 MB（默认 100）
+  - `image_cache_max_days`: 图片缓存过期天数（默认 7）
+
+### Improvements
+
+- 模糊搜索现在优先使用索引快速查找
+- 更多字体路径支持（macOS PingFang、Windows 微软雅黑、Linux Noto）
+- `/tbzhelp` 新增 `/tbzcache` 命令说明
+
 ## v1.1.1
 
 ### Features

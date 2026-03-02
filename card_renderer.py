@@ -2,9 +2,12 @@ import io
 import os
 import re
 import hashlib
+import asyncio
 import aiohttp
 from pathlib import Path
+from functools import lru_cache
 from PIL import Image, ImageDraw, ImageFont
+from typing import Optional
 
 from astrbot.api import logger
 
@@ -12,6 +15,9 @@ FONT_PATHS = [
     "/nix/store/r7w3sysqxkrpjjcjkrhdmxcinl7wiiay-wqy-zenhei-0.9.45/share/fonts/wqy-zenhei.ttc",
     "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
     "/usr/share/fonts/wqy-zenhei/wqy-zenhei.ttc",
+    "/System/Library/Fonts/PingFang.ttc",  # macOS
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",  # Linux with Noto
+    "C:\\Windows\\Fonts\\msyh.ttc",  # Windows
 ]
 
 GITHUB_RAW = "https://raw.githubusercontent.com/Duangi/BazaarHelper/main/src-tauri/resources"
@@ -82,6 +88,11 @@ FONT_SIZE_LINK = 12 * SCALE
 
 _CJK_RANGES = re.compile(r'[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]')
 
+# 图片缓存过期时间（秒）
+IMAGE_CACHE_MAX_AGE = 7 * 24 * 3600  # 7 天
+# 最大缓存文件数
+IMAGE_CACHE_MAX_FILES = 500
+
 
 def _clean_tier(raw: str) -> str:
     if not raw:
@@ -96,46 +107,118 @@ def _get_skill_text(skill_entry) -> str:
 
 
 class CardRenderer:
+    # 类级别的字体缓存
+    _font_cache: dict[tuple[str, int], ImageFont.FreeTypeFont] = {}
+    
     def __init__(self, plugin_dir: Path, session: aiohttp.ClientSession | None = None):
         self.plugin_dir = plugin_dir
         self._session = session
         self.cache_dir = plugin_dir / "data" / "cache"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        self._font_path = None
+        self._font_path: Optional[str] = None
         self._find_font()
+        # 图片内存缓存（避免同一渲染周期重复加载）
+        self._img_memory_cache: dict[str, Image.Image] = {}
+        self._cleanup_count = 0
 
     def _find_font(self):
         for p in FONT_PATHS:
             if os.path.exists(p):
                 self._font_path = p
+                logger.debug(f"使用字体: {p}")
                 return
-        try:
-            from PIL import ImageFont as IF
-            self._font_path = None
-            logger.warning("未找到中文字体，将使用默认字体")
-        except Exception:
-            pass
+        logger.warning("未找到中文字体，将使用默认字体")
+        self._font_path = None
 
     def _font(self, size: int) -> ImageFont.FreeTypeFont:
+        """获取字体对象，使用缓存避免重复加载"""
+        cache_key = (self._font_path, size)
+        if cache_key in CardRenderer._font_cache:
+            return CardRenderer._font_cache[cache_key]
+        
         if self._font_path:
-            return ImageFont.truetype(self._font_path, size)
-        return ImageFont.load_default()
+            font = ImageFont.truetype(self._font_path, size)
+        else:
+            font = ImageFont.load_default()
+        
+        CardRenderer._font_cache[cache_key] = font
+        return font
 
     async def _get_session(self) -> aiohttp.ClientSession:
         if self._session is not None and not self._session.closed:
             return self._session
-        self._session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15))
+        self._session = aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=15),
+            connector=aiohttp.TCPConnector(limit=5, ttl_dns_cache=300)
+        )
         return self._session
 
-    async def _fetch_image(self, url: str) -> Image.Image | None:
+    def _cleanup_image_cache(self, force: bool = False):
+        """清理过期的图片缓存文件"""
+        self._cleanup_count += 1
+        # 每 50 次调用检查一次，或强制清理
+        if not force and self._cleanup_count < 50:
+            return
+        self._cleanup_count = 0
+        
+        try:
+            import time
+            now = time.time()
+            files = list(self.cache_dir.glob("*.webp"))
+            
+            # 按修改时间排序
+            files_with_time = [(f, f.stat().st_mtime) for f in files if f.exists()]
+            files_with_time.sort(key=lambda x: x[1])
+            
+            removed = 0
+            # 删除过期文件
+            for f, mtime in files_with_time:
+                if now - mtime > IMAGE_CACHE_MAX_AGE:
+                    try:
+                        f.unlink()
+                        removed += 1
+                    except OSError:
+                        pass
+            
+            # 如果文件数超过限制，删除最老的
+            remaining = list(self.cache_dir.glob("*.webp"))
+            if len(remaining) > IMAGE_CACHE_MAX_FILES:
+                remaining_with_time = [(f, f.stat().st_mtime) for f in remaining if f.exists()]
+                remaining_with_time.sort(key=lambda x: x[1])
+                for f, _ in remaining_with_time[:len(remaining) - IMAGE_CACHE_MAX_FILES]:
+                    try:
+                        f.unlink()
+                        removed += 1
+                    except OSError:
+                        pass
+            
+            if removed > 0:
+                logger.debug(f"清理图片缓存: 移除 {removed} 个文件")
+        except Exception as e:
+            logger.debug(f"清理图片缓存出错: {e}")
+
+    async def _fetch_image(self, url: str) -> Optional[Image.Image]:
+        """获取图片，优先使用内存缓存，然后磁盘缓存，最后网络请求"""
+        # 内存缓存检查
+        if url in self._img_memory_cache:
+            return self._img_memory_cache[url]
+        
         cache_name = hashlib.md5(url.encode()).hexdigest() + ".webp"
         cache_path = self.cache_dir / cache_name
 
+        # 磁盘缓存检查
         if cache_path.exists():
             try:
-                return Image.open(cache_path).convert("RGBA")
+                img = Image.open(cache_path).convert("RGBA")
+                # 存入内存缓存
+                if len(self._img_memory_cache) < 50:  # 限制内存缓存数量
+                    self._img_memory_cache[url] = img
+                return img
             except Exception:
                 pass
+
+        # 定期清理缓存
+        self._cleanup_image_cache()
 
         try:
             session = await self._get_session()
@@ -144,10 +227,29 @@ class CardRenderer:
                     data = await resp.read()
                     with open(cache_path, "wb") as f:
                         f.write(data)
-                    return Image.open(io.BytesIO(data)).convert("RGBA")
+                    img = Image.open(io.BytesIO(data)).convert("RGBA")
+                    if len(self._img_memory_cache) < 50:
+                        self._img_memory_cache[url] = img
+                    return img
         except Exception as e:
             logger.debug(f"获取图片失败: {url}: {e}")
         return None
+    
+    def clear_memory_cache(self):
+        """清理内存缓存，在渲染完成后调用"""
+        self._img_memory_cache.clear()
+
+    def _save_image(self, img: Image.Image, optimize: bool = True) -> bytes:
+        """统一的图片保存方法，支持压缩优化"""
+        buf = io.BytesIO()
+        # 使用优化参数减少文件大小
+        save_kwargs = {"format": "PNG"}
+        if optimize:
+            save_kwargs["optimize"] = True
+            # compress_level 范围 0-9，值越大压缩越多但越慢
+            save_kwargs["compress_level"] = 6
+        img.save(buf, **save_kwargs)
+        return buf.getvalue()
 
     def _wrap_text(self, text: str, font: ImageFont.FreeTypeFont, max_width: int) -> list:
         lines = []
@@ -416,9 +518,7 @@ class CardRenderer:
                                 y += LINE_HEIGHT_SMALL
                             y += DESC_GAP
 
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        return buf.getvalue()
+        return self._save_image(img)
 
     async def render_item_card(self, item: dict) -> bytes:
         name_cn = item.get("name_cn", "")
@@ -637,9 +737,7 @@ class CardRenderer:
                         y += LINE_HEIGHT_SMALL
                 y += SKILL_DESC_GAP
 
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        return buf.getvalue()
+        return self._save_image(img)
 
     async def render_skill_card(self, skill: dict) -> bytes:
         name_cn = skill.get("name_cn", "")
@@ -738,9 +836,7 @@ class CardRenderer:
                         y += LINE_HEIGHT_SMALL
                     y += DESC_GAP
 
-        buf_skill = io.BytesIO()
-        img.save(buf_skill, format="PNG")
-        return buf_skill.getvalue()
+        return self._save_image(img)
 
     async def render_news_card(self, title: str, date_str: str, body: str, url: str) -> bytes:
         font_title = self._font(24 * SCALE)
@@ -816,9 +912,7 @@ class CardRenderer:
             draw.text((PADDING, y), ul, font=font_link, fill=COLORS["accent"])
             y += LINE_HEIGHT_LINK
 
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        return buf.getvalue()
+        return self._save_image(img)
 
     async def render_tierlist_card(self, hero_en: str, hero_cn: str, tier_items: dict) -> bytes:
         import asyncio
@@ -998,9 +1092,7 @@ class CardRenderer:
             font=font_link, fill=COLORS["accent"]
         )
 
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        return buf.getvalue()
+        return self._save_image(img)
 
     async def render_merchant_card(self, merchant: dict) -> bytes:
         font_title = self._font(FONT_SIZE_TITLE)
@@ -1079,9 +1171,7 @@ class CardRenderer:
             link_url = f"https://bazaarforge.gg/merchants/{slug}"
             draw.text((PADDING, y), link_url, font=font_link, fill=COLORS["accent"])
 
-        buf = io.BytesIO()
-        img_card.save(buf, format="PNG")
-        return buf.getvalue()
+        return self._save_image(img_card)
 
     async def render_build_card(self, query: str, search_term: str, builds: list) -> bytes:
         font_title = self._font(24 * SCALE)
@@ -1169,6 +1259,4 @@ class CardRenderer:
             draw.text((PADDING, y), ml, font=font_link, fill=COLORS["green"])
             y += LINE_HEIGHT_LINK
 
-        buf_build = io.BytesIO()
-        img.save(buf_build, format="PNG")
-        return buf_build.getvalue()
+        return self._save_image(img)

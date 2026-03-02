@@ -72,5 +72,23 @@
     "type": "text",
     "hint": "阵容查询的数据源优先级。可选值：forge_first（优先 BazaarForge，不足时补充 bazaar-builds.net）、wp_first（优先 bazaar-builds.net）、forge_only（仅 BazaarForge）、wp_only（仅 bazaar-builds.net）。",
     "default": "forge_first"
+  },
+  "cache_max_size": {
+    "description": "缓存最大条目数",
+    "type": "int",
+    "hint": "内存缓存最大存储条目数量。增大可提升重复查询性能，但会占用更多内存（100-5000）。",
+    "default": 1000
+  },
+  "cache_max_memory_mb": {
+    "description": "缓存最大内存(MB)",
+    "type": "int",
+    "hint": "内存缓存最大占用空间（MB）。超出时自动清理最久未使用的缓存（10-500）。",
+    "default": 100
+  },
+  "image_cache_max_days": {
+    "description": "图片缓存过期天数",
+    "type": "int",
+    "hint": "本地图片缓存文件的过期天数。过期后自动清理（1-30）。",
+    "default": 7
   }
 }
