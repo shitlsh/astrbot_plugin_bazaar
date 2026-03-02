@@ -30,6 +30,12 @@
 
 ### New Features
 
+- 新增 `/tbzguide <英雄名>` 命令：查询英雄一图流攻略
+  - 支持本地攻略图片目录（`data/guides/{英雄名}/`）
+  - 支持远程 GitHub 仓库获取（通过 `guide_remote_repo` 配置）
+  - 以合并消息（Node）形式返回多张攻略图片
+  - 支持中英文英雄名和别名
+
 - 新增 `/tbzcache` 命令：缓存管理
   - `/tbzcache stats` - 查看缓存统计（内存占用、命中率、图片缓存大小等）
   - `/tbzcache clear` - 清理内存缓存
@@ -41,6 +47,7 @@
   - `cache_max_size`: 内存缓存最大条目数（默认 1000）
   - `cache_max_memory_mb`: 内存缓存最大占用 MB（默认 100）
   - `image_cache_max_days`: 图片缓存过期天数（默认 7）
+- 新增 `guide_remote_repo`: 一图流攻略远程 GitHub 仓库（格式 `owner/repo`）
 
 ### Improvements
 

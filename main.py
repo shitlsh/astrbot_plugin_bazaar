@@ -140,6 +140,10 @@ CACHE_TTL_RENDER = 7200       # 渲染结果缓存 2 小时
 CACHE_MAX_SIZE = 1000         # 最大缓存条目数
 CACHE_MAX_MEMORY_MB = 100     # 最大内存占用 MB
 
+# 一图流攻略
+GUIDE_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+VALID_HEROES = ["Dooley", "Jules", "Mak", "Pygmalien", "Stelle", "Vanessa"]
+
 TIER_LIST_THRESHOLDS = {"S": 15.0, "A": 8.0, "B": 3.0, "C": 0.0}
 
 HERO_EN_MAP = {
@@ -1626,6 +1630,8 @@ class BazaarPlugin(Star):
             "  示例: /tbzbuild 符文匕首\n\n"
             "/tbztier <英雄名> - 查询英雄物品评级(Tier List)\n"
             "  示例: /tbztier 海盗 或 /tbztier Vanessa\n\n"
+            "/tbzguide <英雄名> - 查询英雄一图流攻略\n"
+            "  示例: /tbzguide 海盗 或 /tbzguide Vanessa\n\n"
             "/tbzmerchant <名称> - 查询商人/训练师信息\n"
             "  示例: /tbzmerchant Aila 或 /tbzmerchant Weapon\n\n"
             "/tbzalias - 别名管理(查看/添加/删除)\n"
@@ -1728,6 +1734,204 @@ class BazaarPlugin(Star):
             "  clear - 清理内存缓存\n"
             "  clearimg - 清理图片文件缓存"
         )
+
+    async def _get_guide_images(self, hero_en: str) -> list[tuple[str, bytes]]:
+        """获取一图流攻略图片，返回 [(文件名, 图片数据), ...]"""
+        images = []
+        
+        # 优先从本地读取
+        local_dir = self.plugin_dir / "data" / "guides" / hero_en
+        if local_dir.exists() and local_dir.is_dir():
+            files = sorted([
+                f for f in local_dir.iterdir() 
+                if f.is_file() and f.suffix.lower() in GUIDE_IMAGE_EXTENSIONS
+            ])
+            for f in files:
+                try:
+                    with open(f, "rb") as fp:
+                        images.append((f.name, fp.read()))
+                except Exception as e:
+                    logger.debug(f"读取攻略图片失败 {f}: {e}")
+        
+        # 如果本地没有，尝试从远程仓库获取
+        if not images:
+            # 默认从插件仓库获取
+            default_repo = "shitlsh/astrbot_plugin_bazaar/main/data/guides"
+            remote_repo = self.config.get("guide_remote_repo", "") if self.config else ""
+            remote_repo = remote_repo or default_repo
+            try:
+                images = await self._fetch_remote_guides(remote_repo, hero_en)
+            except Exception as e:
+                logger.warning(f"获取远程攻略失败: {e}")
+        
+        return images
+
+    async def _fetch_remote_guides(self, repo_config: str, hero_en: str) -> list[tuple[str, bytes]]:
+        """从 GitHub 仓库获取攻略图片
+        
+        repo_config 格式: 用户名/仓库名/分支/目录路径
+        例如: shitlsh/astrbot_plugin_bazaar/main/data/guides
+        """
+        parts = repo_config.strip().split("/", 3)
+        if len(parts) < 3:
+            return []
+        
+        user = parts[0]
+        repo = parts[1]
+        branch = parts[2]
+        base_path = parts[3] if len(parts) > 3 else ""
+        
+        # GitHub API 获取目录内容
+        api_url = f"https://api.github.com/repos/{user}/{repo}/contents/{base_path}/{hero_en}?ref={branch}"
+        
+        async def _fetch():
+            session = await self._get_session()
+            try:
+                async with session.get(api_url) as resp:
+                    if resp.status != 200:
+                        return []
+                    return await resp.json()
+            except Exception:
+                return []
+        
+        files_data = await self._cached_request(f"guide_list:{hero_en}", 3600, _fetch)
+        if not files_data or not isinstance(files_data, list):
+            return []
+        
+        # 过滤图片文件
+        image_files = [
+            f for f in files_data 
+            if f.get("type") == "file" and 
+            any(f.get("name", "").lower().endswith(ext) for ext in GUIDE_IMAGE_EXTENSIONS)
+        ]
+        image_files.sort(key=lambda x: x.get("name", ""))
+        
+        # 下载图片
+        images = []
+        session = await self._get_session()
+        for file_info in image_files[:20]:  # 限制最多20张
+            download_url = file_info.get("download_url", "")
+            if not download_url:
+                continue
+            try:
+                async with session.get(download_url) as resp:
+                    if resp.status == 200:
+                        data = await resp.read()
+                        images.append((file_info["name"], data))
+            except Exception as e:
+                logger.debug(f"下载攻略图片失败: {e}")
+        
+        return images
+
+    @filter.command("tbzguide")
+    async def cmd_guide(self, event: AstrMessageEvent):
+        """查询英雄一图流攻略"""
+        query = _extract_query(event.message_str, "tbzguide")
+        
+        if not query:
+            # 显示可用英雄列表
+            lines = [
+                "📖 一图流攻略查询",
+                "━━━━━━━━━━━━━━━━━━",
+                "",
+                "用法: /tbzguide <英雄名>",
+                "",
+                "可用英雄:",
+            ]
+            for hero_en in VALID_HEROES:
+                hero_cn = HERO_CN_MAP.get(hero_en, hero_en)
+                local_dir = self.plugin_dir / "data" / "guides" / hero_en
+                count = 0
+                if local_dir.exists():
+                    count = len([f for f in local_dir.iterdir() 
+                                if f.is_file() and f.suffix.lower() in GUIDE_IMAGE_EXTENSIONS])
+                status = f"({count}张)" if count > 0 else "(暂无)"
+                lines.append(f"  • {hero_cn}({hero_en}) {status}")
+            
+            lines.append("")
+            lines.append("示例:")
+            lines.append("  /tbzguide 海盗")
+            lines.append("  /tbzguide Vanessa")
+            
+            yield event.plain_result("\n".join(lines))
+            return
+        
+        # 解析英雄名
+        query = self._resolve_alias(query)
+        hero_en = self._resolve_hero_name(query)
+        
+        if not hero_en:
+            # 尝试直接匹配英文名
+            for h in VALID_HEROES:
+                if h.lower() == query.lower():
+                    hero_en = h
+                    break
+        
+        if not hero_en or hero_en not in VALID_HEROES:
+            yield event.plain_result(
+                f"未识别英雄「{query}」。\n\n"
+                f"可用英雄: {', '.join(f'{HERO_CN_MAP.get(h, h)}({h})' for h in VALID_HEROES)}"
+            )
+            return
+        
+        hero_cn = HERO_CN_MAP.get(hero_en, hero_en)
+        yield event.plain_result(f"⏳ 正在获取 {hero_cn}({hero_en}) 的一图流攻略...")
+        
+        # 获取图片
+        images = await self._get_guide_images(hero_en)
+        
+        if not images:
+            yield event.plain_result(
+                f"❌ 暂无 {hero_cn}({hero_en}) 的一图流攻略。\n\n"
+                f"💡 管理员可将攻略图片放入:\n"
+                f"   data/guides/{hero_en}/ 目录"
+            )
+            return
+        
+        # 构建合并转发消息
+        nodes = []
+        nodes.append(Comp.Node(
+            name="大巴扎小助手",
+            uin="0",
+            content=[Comp.Plain(f"📖 {hero_cn}({hero_en}) 一图流攻略\n共 {len(images)} 张")]
+        ))
+        
+        for i, (filename, img_data) in enumerate(images, 1):
+            # 去掉扩展名作为标题
+            title = os.path.splitext(filename)[0]
+            # 移除序号前缀（如 01_、1-、1. 等）
+            title = re.sub(r'^[\d]+[-_.\s]*', '', title)
+            if not title:
+                title = f"攻略 {i}"
+            
+            nodes.append(Comp.Node(
+                name="大巴扎小助手",
+                uin="0",
+                content=[
+                    Comp.Image.fromBytes(img_data),
+                    Comp.Plain(f"━━ {i}. {title} ━━"),
+                ]
+            ))
+        
+        nodes.append(Comp.Node(
+            name="大巴扎小助手",
+            uin="0",
+            content=[Comp.Plain(
+                f"💡 攻略来源: 社区收集\n"
+                f"💡 如有更好的攻略，欢迎反馈给管理员"
+            )]
+        ))
+        
+        try:
+            yield event.chain_result([Comp.Nodes(nodes)])
+        except Exception as e:
+            logger.warning(f"合并转发发送失败，回退逐条发送: {e}")
+            for node in nodes:
+                for item in node.content:
+                    if isinstance(item, Comp.Plain):
+                        yield event.plain_result(item.text)
+                    elif isinstance(item, Comp.Image):
+                        yield event.chain_result([item])
 
     @filter.command("tbzmonster")
     async def cmd_monster(self, event: AstrMessageEvent):

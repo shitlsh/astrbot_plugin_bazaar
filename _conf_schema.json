@@ -90,5 +90,11 @@
     "type": "int",
     "hint": "本地图片缓存文件的过期天数。过期后自动清理（1-30）。",
     "default": 7
+  },
+  "guide_remote_repo": {
+    "description": "攻略图片远程仓库",
+    "type": "text",
+    "hint": "一图流攻略图片的 GitHub 仓库地址。格式：owner/repo/branch/path。留空则使用默认仓库（shitlsh/astrbot_plugin_bazaar）。",
+    "default": ""
   }
 }
