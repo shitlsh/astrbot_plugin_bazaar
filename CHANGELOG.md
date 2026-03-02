@@ -28,6 +28,13 @@
   - aiohttp 连接池配置（limit=10, ttl_dns_cache=300）
   - 更合理的超时设置
 
+- **BazaarForge 阵容查询优化**
+  - `_forge_query_builds` 单次查询结果缓存，避免重复 API 请求
+  - 图片下载添加缓存层（24小时 TTL），避免重复下载阵容截图
+  - 缓存 key 移除 count 参数，不同数量的查询共用缓存
+  - 固定获取 30 条数据后按需截取，提升缓存复用率
+  - 重复查询响应时间从 10s+ 降至毫秒级
+
 ### New Features
 
 - 新增 `/tbzguide <英雄名>` 命令：查询英雄一图流攻略

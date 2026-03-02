@@ -389,20 +389,32 @@ class BazaarPlugin(Star):
         return [it["id"] for it in items if it.get("id")]
 
     async def _forge_query_builds(self, params: dict) -> list:
-        session = await self._get_session()
-        url = f"{FORGE_SUPABASE_URL}/rest/v1/builds"
-        try:
-            async with session.get(url, params=params, headers=FORGE_HEADERS) as resp:
-                if resp.status == 200:
-                    return await resp.json()
-        except Exception as e:
-            logger.debug(f"BazaarForge builds 查询失败: {e}")
-        return []
+        """缓存的 BazaarForge builds 查询"""
+        # 生成缓存 key（基于查询参数）
+        cache_parts = []
+        for k in sorted(params.keys()):
+            if k != "select":  # select 字段不影响结果内容
+                cache_parts.append(f"{k}={params[k]}")
+        cache_key = f"forge_build_q:{'&'.join(cache_parts)}"
+        
+        async def _fetch():
+            session = await self._get_session()
+            url = f"{FORGE_SUPABASE_URL}/rest/v1/builds"
+            try:
+                async with session.get(url, params=params, headers=FORGE_HEADERS) as resp:
+                    if resp.status == 200:
+                        return await resp.json()
+            except Exception as e:
+                logger.debug(f"BazaarForge builds 查询失败: {e}")
+            return []
+        
+        return await self._cached_request(cache_key, CACHE_TTL_BUILDS, _fetch)
 
     async def _fetch_builds_forge(self, search_term: str, count: int) -> list:
         async def _fetch():
             select_fields = "id,title,hero,wins,max_health,victory_type,level,screenshot_url,created_at,item_ids"
-            fetch_limit = str(min(count + 5, 30))
+            # 固定 fetch_limit 以确保缓存可复用（无论请求多少条）
+            fetch_limit = "30"
 
             tokens = search_term.split()
             hero_name = None
@@ -501,7 +513,8 @@ class BazaarPlugin(Star):
                 })
 
             return all_builds
-        raw = await self._cached_request(f"forge_builds:{search_term.lower()}:{count}", CACHE_TTL_BUILDS, _fetch)
+        # 缓存 key 不含 count，获取更多数据后截取
+        raw = await self._cached_request(f"forge_builds:{search_term.lower()}", CACHE_TTL_BUILDS, _fetch)
         builds = []
         for b in raw[:count]:
             victory = b.get("victory_type", "")
@@ -545,7 +558,7 @@ class BazaarPlugin(Star):
             url = f"{BUILDS_API}/posts"
             params = {
                 "search": search_term,
-                "per_page": min(count + 5, 20),
+                "per_page": 20,  # 固定获取20条，确保缓存可复用
                 "_fields": "id,title,link,date,excerpt,featured_media",
             }
             try:
@@ -557,8 +570,6 @@ class BazaarPlugin(Star):
 
                 filtered = []
                 for post in posts:
-                    if len(filtered) >= count:
-                        break
                     title = html_module.unescape(post.get("title", {}).get("rendered", ""))
                     if BUILD_FILTER_PATTERNS.search(title):
                         continue
@@ -603,7 +614,7 @@ class BazaarPlugin(Star):
             except Exception as e:
                 logger.warning(f"查询阵容失败 (bazaar-builds.net): {e}")
                 return []
-        return await self._cached_request(f"wp_builds:{search_term.lower()}:{count}", CACHE_TTL_BUILDS, _fetch)
+        return await self._cached_request(f"wp_builds:{search_term.lower()}", CACHE_TTL_BUILDS, _fetch)
 
     async def _fetch_builds_combined(self, search_term: str, count: int) -> list:
         if self.config:
@@ -2575,11 +2586,27 @@ class BazaarPlugin(Star):
         return search_term, display
 
     async def _download_image(self, url: str) -> bytes | None:
+        """带缓存的图片下载"""
+        if not url:
+            return None
+        
+        # 使用 URL hash 作为缓存 key
+        import hashlib
+        cache_key = f"img:{hashlib.md5(url.encode()).hexdigest()[:16]}"
+        
+        # 检查缓存
+        hit, cached = self._cache.get(cache_key)
+        if hit:
+            return cached
+        
         try:
             session = await self._get_session()
-            async with session.get(url) as resp:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                 if resp.status == 200:
-                    return await resp.read()
+                    data = await resp.read()
+                    # 缓存图片（24小时）
+                    self._cache.set(cache_key, data, CACHE_TTL_IMAGE)
+                    return data
         except Exception as e:
             logger.debug(f"图片下载失败: {url}: {e}")
         return None
