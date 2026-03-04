@@ -39,8 +39,20 @@ class LRUCache:
             return len(value)
         elif isinstance(value, str):
             return len(value.encode('utf-8'))
-        elif isinstance(value, (list, dict)):
-            return len(json.dumps(value, ensure_ascii=False).encode('utf-8'))
+        elif isinstance(value, dict):
+            size = 256
+            for k, v in value.items():
+                size += self._estimate_size(k) + self._estimate_size(v)
+            return size
+        elif isinstance(value, (list, tuple, set)):
+            size = 128
+            for v in value:
+                size += self._estimate_size(v)
+            return size
+        try:
+            return len(json.dumps(value, ensure_ascii=False, default=str).encode('utf-8'))
+        except Exception:
+            pass
         return 1024  # 默认 1KB
     
     def get(self, key: str) -> tuple[bool, Any]:
@@ -2964,8 +2976,10 @@ class BazaarPlugin(Star):
         version = query.strip() if query else ""
         if version:
             version = version.lower().lstrip("v")
+            yield event.plain_result(f"⏳ 正在获取官网中文补丁说明（版本 {version}）...")
         else:
             version = ""
+            yield event.plain_result("⏳ 正在获取官网最新中文补丁说明...")
 
         patch_notes_cn = await self._fetch_latest_patch_notes_cn(version or None)
         if not patch_notes_cn:
