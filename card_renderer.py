@@ -988,6 +988,28 @@ class CardRenderer:
 
         return images
 
+    def describe_patch_pages(self, sections: list[tuple[str, str]]) -> list[str]:
+        font_body = self._font(15 * SCALE)
+        card_width = BUILD_CARD_WIDTH
+        content_width = card_width - PADDING * 2
+        normalized_sections = sections or [("补丁更新", "")]
+        max_lines_per_card = 170
+
+        page_sections: list[str] = []
+        for sec_name, sec_text in normalized_sections:
+            raw = sec_text or ""
+            sec_lines = self._wrap_text(raw, font_body, content_width - INDENT)
+            if not sec_lines:
+                sec_lines = ["(无正文内容)"]
+            chunks = [sec_lines[i:i + max_lines_per_card] for i in range(0, len(sec_lines), max_lines_per_card)]
+            for _ in chunks:
+                page_sections.append(sec_name)
+
+        total = len(page_sections)
+        if total == 0:
+            return []
+        return [f"{i}/{total} {name}" for i, name in enumerate(page_sections, 1)]
+
     async def render_tierlist_card(self, hero_en: str, hero_cn: str, tier_items: dict) -> bytes:
         import asyncio
 

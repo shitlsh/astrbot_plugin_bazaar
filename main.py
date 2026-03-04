@@ -248,6 +248,7 @@ PATCH_NOTES_INDEX_URL = "https://playthebazaar.com/api/cdn/data/data/patch-notes
 PATCH_NOTES_BASE_URL = "https://playthebazaar.com/api/cdn/data"
 PATCH_NOTES_SOURCE_URL = "https://playthebazaar.com/patch-notes"
 PATCH_CARD_DISK_DIR = "patch_cards"
+PATCH_CARD_LAYOUT_VERSION = "hero_split_v2"
 
 HERO_CN_MAP = {
     "Common": "通用", "Dooley": "杜利", "Jules": "朱尔斯",
@@ -365,40 +366,45 @@ def _markdown_to_preview(markdown_text: str, max_chars: int = 1400) -> str:
     return "\n".join(selected).strip()
 
 
-def _split_patch_sections(body: str) -> list[tuple[str, str]]:
-    if not body:
+def _split_patch_sections(markdown_text: str) -> list[tuple[str, str]]:
+    if not markdown_text:
         return []
 
-    hero_headers = {
-        "杜利", "朱尔斯", "马克", "皮格马利翁", "斯黛拉", "凡妮莎",
-        "DOOLEY", "JULES", "MAK", "PYGMALIEN", "STELLE", "VANESSA",
+    hero_map = {
+        "杜利": "杜利", "DOOLEY": "杜利",
+        "朱尔斯": "朱尔斯", "JULES": "朱尔斯",
+        "马克": "马克", "MAK": "马克",
+        "皮格马利翁": "皮格马利翁", "PYGMALIEN": "皮格马利翁",
+        "斯黛拉": "斯黛拉", "STELLE": "斯黛拉",
+        "凡妮莎": "凡妮莎", "VANESSA": "凡妮莎",
     }
 
-    lines = body.split("\n")
+    lines = markdown_text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
     common_lines: list[str] = []
-    sections: list[tuple[str, list[str]]] = []
-    current_name = ""
+    hero_sections: list[tuple[str, list[str]]] = []
+    current_hero = ""
     current_lines: list[str] = []
 
     def _flush_current():
-        nonlocal current_name, current_lines
-        if current_name and any(l.strip() for l in current_lines):
-            sections.append((current_name, current_lines[:]))
-        current_name = ""
+        nonlocal current_hero, current_lines
+        if current_hero and any(l.strip() for l in current_lines):
+            hero_sections.append((current_hero, current_lines[:]))
+        current_hero = ""
         current_lines = []
 
     for line in lines:
         stripped = line.strip()
-        heading_match = re.match(r'^#{2,3}\s*(.+?)\s*$', stripped)
+        heading_match = re.match(r'^###\s+(.+?)\s*$', stripped)
         if heading_match:
             heading_text = heading_match.group(1).strip()
-            if heading_text.upper() in hero_headers or heading_text in hero_headers:
+            hero_name = hero_map.get(heading_text.upper()) or hero_map.get(heading_text)
+            if hero_name:
                 _flush_current()
-                current_name = heading_text
-                current_lines = [f"### {heading_text}"]
+                current_hero = hero_name
+                current_lines = [f"### {hero_name}"]
                 continue
 
-        if current_name:
+        if current_hero:
             current_lines.append(line)
         else:
             common_lines.append(line)
@@ -406,17 +412,22 @@ def _split_patch_sections(body: str) -> list[tuple[str, str]]:
     _flush_current()
 
     result: list[tuple[str, str]] = []
-    common_text = "\n".join(common_lines).strip()
+    common_text = _clean_patch_markdown("\n".join(common_lines).strip())
     if common_text:
-        result.append(("通用更新", common_text))
+        result.append(("通用", common_text))
 
-    for name, slines in sections:
-        text = "\n".join(slines).strip()
-        if text:
-            result.append((name, text))
+    ordered_heroes = ["杜利", "朱尔斯", "马克", "皮格马利翁", "斯黛拉", "凡妮莎"]
+    hero_dict = {name: text_lines for name, text_lines in hero_sections}
+    for hero in ordered_heroes:
+        if hero in hero_dict:
+            hero_text = _clean_patch_markdown("\n".join(hero_dict[hero]).strip())
+            if hero_text:
+                result.append((hero, hero_text))
 
     if not result:
-        result.append(("补丁更新", body.strip()))
+        fallback = _clean_patch_markdown(markdown_text)
+        if fallback:
+            result.append(("补丁更新", fallback))
     return result
 
 TIER_MAP = {
@@ -520,8 +531,8 @@ class BazaarPlugin(Star):
         version = str(patch_notes_cn.get("version", "latest")).strip().lower().replace("/", "_")
         body = patch_notes_cn.get("body", "")
         body_hash = hashlib.sha1(body.encode("utf-8")).hexdigest()[:16]
-        key = f"patch_cards:{version}:{body_hash}"
-        prefix = f"{version}_{body_hash}"
+        key = f"patch_cards:{PATCH_CARD_LAYOUT_VERSION}:{version}:{body_hash}"
+        prefix = f"{PATCH_CARD_LAYOUT_VERSION}_{version}_{body_hash}"
         return key, prefix
 
     def _load_patch_cards_from_disk(self, prefix: str) -> list[bytes]:
@@ -565,7 +576,7 @@ class BazaarPlugin(Star):
             self._cache.set(cache_key, disk_images, CACHE_TTL_RENDER)
             return disk_images
 
-        sections = _split_patch_sections(patch_notes_cn.get("body", ""))
+        sections = patch_notes_cn.get("sections") or _split_patch_sections(patch_notes_cn.get("body", ""))
         images = await self.renderer.render_patch_cards(
             patch_notes_cn["title"],
             patch_notes_cn["date"],
@@ -2885,12 +2896,15 @@ class BazaarPlugin(Star):
             if not body:
                 return None
 
+            sections = _split_patch_sections(markdown_text)
+
             return {
                 "version": str(zh_entry.get("version", "")).strip(),
                 "date": str(zh_entry.get("date", "")).strip(),
                 "title": title,
                 "url": patch_url,
                 "body": body,
+                "sections": sections,
                 "preview": preview,
                 "source": PATCH_NOTES_SOURCE_URL,
             }
@@ -2950,9 +2964,8 @@ class BazaarPlugin(Star):
         version = query.strip() if query else ""
         if version:
             version = version.lower().lstrip("v")
-            yield event.plain_result(f"⏳ 正在获取官网中文补丁说明（版本 {version}）...")
         else:
-            yield event.plain_result("⏳ 正在获取官网最新中文补丁说明...")
+            version = ""
 
         patch_notes_cn = await self._fetch_latest_patch_notes_cn(version or None)
         if not patch_notes_cn:
@@ -2967,55 +2980,26 @@ class BazaarPlugin(Star):
 
         try:
             card_images = await self._get_patch_card_images(patch_notes_cn)
-            if len(card_images) == 1:
-                yield event.chain_result([Comp.Image.fromBytes(card_images[0])])
-                return
-
-            nodes = [Comp.Node(
-                name="大巴扎小助手", uin="0",
-                content=[Comp.Plain(
-                    f"🧩 {patch_notes_cn['title']}\n"
-                    f"📅 {patch_notes_cn['date']} | 版本 {patch_notes_cn['version']}\n"
-                    f"📄 共 {len(card_images)} 张补丁卡片"
-                )]
-            )]
+            sections = patch_notes_cn.get("sections") or _split_patch_sections(patch_notes_cn.get("body", ""))
+            page_labels = self.renderer.describe_patch_pages(sections)
+            nodes = []
             for i, img in enumerate(card_images, 1):
+                label = page_labels[i - 1] if i - 1 < len(page_labels) else f"{i}/{len(card_images)} 补丁"
                 nodes.append(Comp.Node(
                     name="大巴扎小助手", uin="0",
                     content=[
                         Comp.Image.fromBytes(img),
-                        Comp.Plain(f"━━ 补丁正文 {i}/{len(card_images)} ━━")
+                        Comp.Plain(label),
                     ]
                 ))
-            nodes.append(Comp.Node(
-                name="大巴扎小助手", uin="0",
-                content=[Comp.Plain(
-                    f"🔗 官方补丁页: {patch_notes_cn['source']}\n"
-                    f"🔗 中文文档: {patch_notes_cn['url']}"
-                )]
-            ))
+            if not nodes:
+                yield event.plain_result("❌ 补丁卡片为空，请稍后再试。")
+                return
             yield event.chain_result([Comp.Nodes(nodes)])
             return
         except Exception as e:
-            logger.warning(f"补丁卡片渲染失败，回退文本: {e}")
-
-        body = patch_notes_cn.get("body", "")
-        header = (
-            f"🧩 {patch_notes_cn['title']}\n"
-            f"📅 {patch_notes_cn['date']}\n"
-            f"🏷️ 版本: {patch_notes_cn['version']}\n"
-            f"🔗 中文文档: {patch_notes_cn['url']}"
-        )
-        yield event.plain_result(header)
-
-        chunk_size = 1500
-        text_body = body or patch_notes_cn.get("preview", "")
-        total = max(1, (len(text_body) + chunk_size - 1) // chunk_size)
-        for i in range(total):
-            chunk = text_body[i * chunk_size:(i + 1) * chunk_size]
-            yield event.plain_result(f"📄 补丁正文 {i + 1}/{total}\n\n{chunk}")
-
-        yield event.plain_result(f"🔗 官方补丁页: {patch_notes_cn['source']}")
+            logger.warning(f"补丁卡片渲染失败: {e}")
+            yield event.plain_result("❌ 补丁卡片渲染失败，请稍后再试。")
 
     @filter.command("tbznews")
     async def cmd_news(self, event: AstrMessageEvent):
@@ -3057,40 +3041,22 @@ class BazaarPlugin(Star):
             if patch_notes_cn:
                 try:
                     patch_images = await self._get_patch_card_images(patch_notes_cn)
-                    patch_nodes = [Comp.Node(
-                        name="大巴扎小助手", uin="0",
-                        content=[Comp.Plain(
-                            f"📌 公告提及官网补丁页，附上中文补丁卡片\n"
-                            f"🧩 {patch_notes_cn['title']} ({patch_notes_cn['date']})"
-                        )]
-                    )]
+                    sections = patch_notes_cn.get("sections") or _split_patch_sections(patch_notes_cn.get("body", ""))
+                    page_labels = self.renderer.describe_patch_pages(sections)
+                    patch_nodes = []
                     for i, img in enumerate(patch_images, 1):
+                        label = page_labels[i - 1] if i - 1 < len(page_labels) else f"{i}/{len(patch_images)} 补丁"
                         patch_nodes.append(Comp.Node(
                             name="大巴扎小助手", uin="0",
                             content=[
                                 Comp.Image.fromBytes(img),
-                                Comp.Plain(f"━━ 补丁卡片 {i}/{len(patch_images)} ━━"),
+                                Comp.Plain(label),
                             ]
                         ))
-                    patch_nodes.append(Comp.Node(
-                        name="大巴扎小助手", uin="0",
-                        content=[Comp.Plain(
-                            f"🔗 官方补丁页: {patch_notes_cn['source']}\n"
-                            f"🔗 中文文档: {patch_notes_cn['url']}"
-                        )]
-                    ))
-                    yield event.chain_result([Comp.Nodes(patch_nodes)])
+                    if patch_nodes:
+                        yield event.chain_result([Comp.Nodes(patch_nodes)])
                 except Exception as e:
-                    logger.warning(f"tbznews 补丁卡片发送失败，回退摘要: {e}")
-                    patch_preview = patch_notes_cn["preview"][:1400]
-                    yield event.plain_result(
-                        f"📌 公告提及官网补丁页，附上最新中文补丁摘要\n"
-                        f"🧩 {patch_notes_cn['title']}\n"
-                        f"📅 {patch_notes_cn['date']}\n\n"
-                        f"{patch_preview}\n\n"
-                        f"🔗 官方补丁页: {patch_notes_cn['source']}\n"
-                        f"🔗 中文文档: {patch_notes_cn['url']}"
-                    )
+                    logger.warning(f"tbznews 补丁卡片发送失败: {e}")
             return
 
         nodes = []
@@ -3124,42 +3090,19 @@ class BazaarPlugin(Star):
         if patch_notes_cn:
             try:
                 patch_images = await self._get_patch_card_images(patch_notes_cn)
-                nodes.append(Comp.Node(
-                    name="大巴扎小助手", uin="0",
-                    content=[Comp.Plain(
-                        f"📌 公告提及官网补丁页，附上中文补丁卡片\n"
-                        f"🧩 {patch_notes_cn['title']} ({patch_notes_cn['date']})"
-                    )]
-                ))
+                sections = patch_notes_cn.get("sections") or _split_patch_sections(patch_notes_cn.get("body", ""))
+                page_labels = self.renderer.describe_patch_pages(sections)
                 for i, img in enumerate(patch_images, 1):
+                    label = page_labels[i - 1] if i - 1 < len(page_labels) else f"{i}/{len(patch_images)} 补丁"
                     nodes.append(Comp.Node(
                         name="大巴扎小助手", uin="0",
                         content=[
                             Comp.Image.fromBytes(img),
-                            Comp.Plain(f"━━ 补丁卡片 {i}/{len(patch_images)} ━━"),
+                            Comp.Plain(label),
                         ]
                     ))
-                nodes.append(Comp.Node(
-                    name="大巴扎小助手", uin="0",
-                    content=[Comp.Plain(
-                        f"🔗 官方补丁页: {patch_notes_cn['source']}\n"
-                        f"🔗 中文文档: {patch_notes_cn['url']}"
-                    )]
-                ))
             except Exception as e:
-                logger.warning(f"tbznews 补丁卡片发送失败，回退摘要: {e}")
-                patch_preview = patch_notes_cn["preview"][:1600]
-                nodes.append(Comp.Node(
-                    name="大巴扎小助手", uin="0",
-                    content=[Comp.Plain(
-                        f"📌 公告提及官网补丁页，附上最新中文补丁摘要\n"
-                        f"🧩 {patch_notes_cn['title']}\n"
-                        f"📅 {patch_notes_cn['date']}\n\n"
-                        f"{patch_preview}\n\n"
-                        f"🔗 官方补丁页: {patch_notes_cn['source']}\n"
-                        f"🔗 中文文档: {patch_notes_cn['url']}"
-                    )]
-                ))
+                logger.warning(f"tbznews 补丁卡片发送失败: {e}")
 
         try:
             yield event.chain_result([Comp.Nodes(nodes)])
