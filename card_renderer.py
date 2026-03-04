@@ -931,7 +931,23 @@ class CardRenderer:
         page_chunks: list[tuple[str, list[str]]] = []
         for sec_name, sec_text in normalized_sections:
             raw = sec_text or ""
-            sec_lines = self._wrap_text(raw, font_body, content_width - INDENT)
+            sec_lines: list[str] = []
+            for raw_line in raw.split("\n"):
+                line = raw_line.rstrip()
+                stripped = line.strip()
+                if not stripped:
+                    sec_lines.append("")
+                    continue
+                if stripped.startswith("### ") or stripped.startswith("## ") or stripped.startswith("# "):
+                    sec_lines.append(stripped)
+                    continue
+
+                wrapped = self._wrap_text(stripped, font_body, content_width - INDENT)
+                if wrapped:
+                    sec_lines.extend(wrapped)
+                else:
+                    sec_lines.append(stripped)
+
             if not sec_lines:
                 sec_lines = ["(无正文内容)"]
             chunks = [sec_lines[i:i + max_lines_per_card] for i in range(0, len(sec_lines), max_lines_per_card)]
@@ -967,14 +983,15 @@ class CardRenderer:
             y = header_h + PADDING + SECTION_GAP
             for line in chunk_lines:
                 stripped = line.strip()
+                display_text = stripped.replace("**", "").replace("__", "")
                 if stripped.startswith("### "):
-                    draw.text((PADDING + INDENT, y), stripped[4:], font=font_subtitle, fill=COLORS["orange"])
+                    draw.text((PADDING + INDENT, y), display_text[4:], font=font_subtitle, fill=COLORS["orange"])
                 elif stripped.startswith("## "):
-                    draw.text((PADDING + INDENT, y), stripped[3:], font=font_subtitle, fill=COLORS["green"])
+                    draw.text((PADDING + INDENT, y), display_text[3:], font=font_subtitle, fill=COLORS["green"])
                 elif stripped.startswith("# "):
-                    draw.text((PADDING + INDENT, y), stripped[2:], font=font_subtitle, fill=COLORS["accent"])
+                    draw.text((PADDING + INDENT, y), display_text[2:], font=font_subtitle, fill=COLORS["accent"])
                 else:
-                    draw.text((PADDING + INDENT, y), stripped, font=font_body, fill=COLORS["text"])
+                    draw.text((PADDING + INDENT, y), display_text, font=font_body, fill=COLORS["text"])
                 y += LINE_HEIGHT_BODY
 
             y += SECTION_GAP

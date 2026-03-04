@@ -314,8 +314,6 @@ def _clean_patch_markdown(markdown_text: str) -> str:
     text = re.sub(r'<[^>]+>', '', text)
     text = re.sub(r'\[(.*?)\]\((https?://[^\)]+)\)', r'\1', text)
     text = re.sub(r'`{1,3}', '', text)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-    text = re.sub(r'__(.*?)__', r'\1', text)
 
     skip_exact = {
         "Patch Notes", "BROWSE", "RESOURCES", "We value your privacy",
@@ -390,10 +388,12 @@ def _split_patch_sections(markdown_text: str) -> list[tuple[str, str]]:
         "斯黛拉": "斯黛拉", "STELLE": "斯黛拉",
         "凡妮莎": "凡妮莎", "VANESSA": "凡妮莎",
     }
+    skills_titles = {"技能", "SKILLS"}
 
     lines = markdown_text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
     common_lines: list[str] = []
     hero_sections: list[tuple[str, list[str]]] = []
+    skills_sections: list[list[str]] = []
     current_hero = ""
     current_lines: list[str] = []
 
@@ -409,14 +409,24 @@ def _split_patch_sections(markdown_text: str) -> list[tuple[str, str]]:
         heading_match = re.match(r'^###\s+(.+?)\s*$', stripped)
         if heading_match:
             heading_text = heading_match.group(1).strip()
+            normalized_heading = heading_text.upper()
             hero_name = hero_map.get(heading_text.upper()) or hero_map.get(heading_text)
             if hero_name:
                 _flush_current()
                 current_hero = hero_name
                 current_lines = [f"### {hero_name}"]
                 continue
+            if normalized_heading in skills_titles:
+                _flush_current()
+                block = [f"### {heading_text}"]
+                skills_sections.append(block)
+                current_hero = "__SKILLS__"
+                current_lines = block
+                continue
 
-        if current_hero:
+        if current_hero and current_hero != "__SKILLS__":
+            current_lines.append(line)
+        elif current_hero == "__SKILLS__":
             current_lines.append(line)
         else:
             common_lines.append(line)
@@ -435,6 +445,11 @@ def _split_patch_sections(markdown_text: str) -> list[tuple[str, str]]:
             hero_text = _clean_patch_markdown("\n".join(hero_dict[hero]).strip())
             if hero_text:
                 result.append((hero, hero_text))
+
+    for s in skills_sections:
+        skills_text = _clean_patch_markdown("\n".join(s).strip())
+        if skills_text:
+            result.append(("技能", skills_text))
 
     if not result:
         fallback = _clean_patch_markdown(markdown_text)
