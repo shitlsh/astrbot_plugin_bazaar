@@ -328,6 +328,7 @@ def _clean_patch_markdown(markdown_text: str) -> str:
     cleaned_lines = []
     in_css_block = False
     for raw_line in text.split("\n"):
+        leading_spaces = len(raw_line) - len(raw_line.lstrip(" "))
         line = raw_line.strip()
         if not line:
             continue
@@ -351,7 +352,10 @@ def _clean_patch_markdown(markdown_text: str) -> str:
         if ";" in line and ":" in line and not line.startswith("- "):
             continue
 
-        line = re.sub(r'^[-*+]\s*', '- ', line)
+        bullet_match = re.match(r'^[-*+]\s*(.*)$', line)
+        if bullet_match:
+            indent_level = min(max(0, leading_spaces // 2), 6)
+            line = ("  " * indent_level) + "- " + bullet_match.group(1).strip()
         line = re.sub(r'\n{2,}', '\n', line)
         cleaned_lines.append(line)
 

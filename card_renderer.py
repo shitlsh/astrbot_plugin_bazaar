@@ -293,6 +293,22 @@ class CardRenderer:
     def _draw_divider(self, draw, y, card_width):
         draw.line((PADDING, y, card_width - PADDING, y), fill=COLORS["divider"], width=SCALE)
 
+    def _draw_markdown_emphasis_line(self, draw: ImageDraw.ImageDraw, x: int, y: int, text: str,
+                                     font: ImageFont.FreeTypeFont, normal_color, emphasis_color):
+        parts = re.split(r'(\*\*.*?\*\*|__.*?__)', text)
+        cursor_x = x
+        for part in parts:
+            if not part:
+                continue
+            is_em = (part.startswith("**") and part.endswith("**")) or (part.startswith("__") and part.endswith("__"))
+            segment = part[2:-2] if is_em else part
+            if not segment:
+                continue
+            color = emphasis_color if is_em else normal_color
+            draw.text((cursor_x, y), segment, font=font, fill=color)
+            bbox = font.getbbox(segment)
+            cursor_x += max(0, bbox[2] - bbox[0])
+
     def _draw_tier_badge(self, draw, tier_raw, tier_clean, y, card_width, font_tag):
         tier_color = TIER_COLORS.get(tier_clean, COLORS["text_dim"])
         tier_badge = f" {tier_raw} "
@@ -933,13 +949,29 @@ class CardRenderer:
             raw = sec_text or ""
             sec_lines: list[str] = []
             for raw_line in raw.split("\n"):
-                line = raw_line.rstrip()
+                line = raw_line.rstrip("\n")
                 stripped = line.strip()
                 if not stripped:
                     sec_lines.append("")
                     continue
                 if stripped.startswith("### ") or stripped.startswith("## ") or stripped.startswith("# "):
                     sec_lines.append(stripped)
+                    continue
+
+                bullet_match = re.match(r'^(\s*)-\s+(.*)$', line)
+                if bullet_match:
+                    lead_spaces = len(bullet_match.group(1))
+                    indent_level = min(max(0, lead_spaces // 2), 6)
+                    bullet_text = bullet_match.group(2).strip()
+                    bullet_prefix = ("  " * indent_level) + "- "
+                    cont_prefix = ("  " * indent_level) + "  "
+                    wrapped = self._wrap_text(bullet_text, font_body, content_width - INDENT - INDENT_DEEP * indent_level - 16 * SCALE)
+                    if wrapped:
+                        sec_lines.append(bullet_prefix + wrapped[0])
+                        for wl in wrapped[1:]:
+                            sec_lines.append(cont_prefix + wl)
+                    else:
+                        sec_lines.append(bullet_prefix)
                     continue
 
                 wrapped = self._wrap_text(stripped, font_body, content_width - INDENT)
@@ -982,7 +1014,12 @@ class CardRenderer:
 
             y = header_h + PADDING + SECTION_GAP
             for line in chunk_lines:
-                stripped = line.strip()
+                raw_line = line.rstrip("\n")
+                stripped = raw_line.strip()
+                indent_spaces = len(raw_line) - len(raw_line.lstrip(" "))
+                indent_level = min(max(0, indent_spaces // 2), 6)
+                text_x = PADDING + INDENT + indent_level * (INDENT // 2)
+                display_text = raw_line.lstrip(" ")
                 if stripped.startswith("### "):
                     draw.text((PADDING + INDENT, y), stripped[4:], font=font_subtitle, fill=COLORS["orange"])
                 elif stripped.startswith("## "):
@@ -990,7 +1027,15 @@ class CardRenderer:
                 elif stripped.startswith("# "):
                     draw.text((PADDING + INDENT, y), stripped[2:], font=font_subtitle, fill=COLORS["accent"])
                 else:
-                    draw.text((PADDING + INDENT, y), stripped, font=font_body, fill=COLORS["text"])
+                    self._draw_markdown_emphasis_line(
+                        draw,
+                        text_x,
+                        y,
+                        display_text,
+                        font_body,
+                        COLORS["text"],
+                        COLORS["accent"],
+                    )
                 y += LINE_HEIGHT_BODY
 
             y += SECTION_GAP
