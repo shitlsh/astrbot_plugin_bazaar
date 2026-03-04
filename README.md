@@ -159,10 +159,12 @@ sudo yum install wqy-zenhei-fonts
 
 ### /tbzpatch 官网中文补丁
 
-直接获取官网中文补丁说明（不依赖 Steam 公告触发），返回精简摘要与原文链接。
+直接获取官网中文补丁说明（不依赖 Steam 公告触发），返回完整正文。
 
 - 数据索引：`/api/cdn/data/data/patch-notes.json`
 - 中文正文：`/api/cdn/data/docs/pn/.../..._zh_CN.md`
+- 默认以图片卡片返回，正文过长会自动分成多张卡片（不截断）
+- 自动清理官网文档里的样式/CSS/页脚等非正文噪音内容
 - 无参数：返回最新中文补丁（`/tbzpatch`）
 - 带版本号：返回指定版本中文补丁（`/tbzpatch 11.0`，也支持 `v11.0`）
 

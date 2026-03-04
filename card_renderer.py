@@ -914,6 +914,73 @@ class CardRenderer:
 
         return self._save_image(img)
 
+    async def render_patch_cards(self, title: str, date_str: str, version: str, body: str, url: str) -> list[bytes]:
+        font_title = self._font(24 * SCALE)
+        font_subtitle = self._font(FONT_SIZE_SUBTITLE)
+        font_body = self._font(15 * SCALE)
+        font_small = self._font(FONT_SIZE_SMALL)
+        font_link = self._font(FONT_SIZE_LINK)
+
+        card_width = BUILD_CARD_WIDTH
+        content_width = card_width - PADDING * 2
+        header_h = 80 * SCALE
+
+        lines = self._wrap_text(body or "", font_body, content_width - INDENT)
+        if not lines:
+            lines = ["(无正文内容)"]
+
+        max_lines_per_card = 170
+        chunks = [lines[i:i + max_lines_per_card] for i in range(0, len(lines), max_lines_per_card)]
+        total_cards = len(chunks)
+
+        images: list[bytes] = []
+        for idx, chunk_lines in enumerate(chunks, 1):
+            body_h = len(chunk_lines) * LINE_HEIGHT_BODY + SECTION_GAP
+            footer_lines = self._wrap_text(url, font_link, content_width)
+            footer_h = max(2, len(footer_lines[:2])) * LINE_HEIGHT_LINK + PADDING
+            total_height = header_h + body_h + footer_h + PADDING * 3
+
+            img = Image.new("RGBA", (card_width, total_height), COLORS["bg"])
+            draw = ImageDraw.Draw(img)
+
+            self._draw_rounded_rect(draw, (0, 0, card_width, header_h + PADDING), HEADER_RADIUS, COLORS["header_bg"])
+
+            y = PADDING
+            head_title = title
+            if total_cards > 1:
+                head_title = f"{title} ({idx}/{total_cards})"
+            title_lines = self._wrap_text(head_title, font_title, content_width - 10 * SCALE)
+            for tl in title_lines[:2]:
+                draw.text((PADDING, y + 4 * SCALE), tl, font=font_title, fill=COLORS["text"])
+                y += 30 * SCALE
+
+            meta = f"{date_str}  |  版本 {version}"
+            draw.text((PADDING, y + 2 * SCALE), meta, font=font_small, fill=COLORS["text_dim"])
+
+            y = header_h + PADDING + SECTION_GAP
+            for line in chunk_lines:
+                stripped = line.strip()
+                if stripped.startswith("### "):
+                    draw.text((PADDING + INDENT, y), stripped[4:], font=font_subtitle, fill=COLORS["orange"])
+                elif stripped.startswith("## "):
+                    draw.text((PADDING + INDENT, y), stripped[3:], font=font_subtitle, fill=COLORS["green"])
+                elif stripped.startswith("# "):
+                    draw.text((PADDING + INDENT, y), stripped[2:], font=font_subtitle, fill=COLORS["accent"])
+                else:
+                    draw.text((PADDING + INDENT, y), stripped, font=font_body, fill=COLORS["text"])
+                y += LINE_HEIGHT_BODY
+
+            y += SECTION_GAP
+            self._draw_divider(draw, y, card_width)
+            y += SECTION_GAP
+            for ul in footer_lines[:2]:
+                draw.text((PADDING, y), ul, font=font_link, fill=COLORS["accent"])
+                y += LINE_HEIGHT_LINK
+
+            images.append(self._save_image(img))
+
+        return images
+
     async def render_tierlist_card(self, hero_en: str, hero_cn: str, tier_items: dict) -> bytes:
         import asyncio
 

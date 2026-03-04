@@ -286,48 +286,81 @@ def _extract_patch_notes_link(text: str) -> str | None:
     return None
 
 
-def _markdown_to_preview(markdown_text: str, max_chars: int = 1400) -> str:
+def _clean_patch_markdown(markdown_text: str) -> str:
     if not markdown_text:
         return ""
 
     text = markdown_text.replace("\r\n", "\n").replace("\r", "\n")
+    text = re.sub(r'<!--.*?-->', '', text, flags=re.DOTALL)
+    text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.IGNORECASE | re.DOTALL)
+    text = re.sub(r'<script[^>]*>.*?</script>', '', text, flags=re.IGNORECASE | re.DOTALL)
     text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
-    text = re.sub(r'</?(?:div|span|em|strong|p|h1|h2|h3|h4|h5|h6)[^>]*>', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'</?(?:div|span|em|strong|p|h1|h2|h3|h4|h5|h6|ul|ol|li)[^>]*>', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'<[^>]+>', '', text)
     text = re.sub(r'\[(.*?)\]\((https?://[^\)]+)\)', r'\1', text)
     text = re.sub(r'`{1,3}', '', text)
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
     text = re.sub(r'__(.*?)__', r'\1', text)
 
+    skip_exact = {
+        "Patch Notes", "BROWSE", "RESOURCES", "We value your privacy",
+        "Language ▼ Version ▼", "美观输出"
+    }
+    skip_contains = [
+        "View Tempo website", "View The Bazaar Discord", "View The Bazaar YouTube",
+        "View The Bazaar Reddit", "Privacy Policy", "Terms of Service",
+        "Cookie Policy", "Contact Us", "AVY Entertainment"
+    ]
+
     cleaned_lines = []
+    in_css_block = False
     for raw_line in text.split("\n"):
         line = raw_line.strip()
         if not line:
             continue
-        if line.startswith("<") and line.endswith(">"):
+
+        if line.endswith("{") and (line.startswith(".") or line.startswith("@media") or line.startswith("#")):
+            in_css_block = True
             continue
-        line = re.sub(r'^#{1,6}\s*', '', line)
+        if in_css_block:
+            if line == "}":
+                in_css_block = False
+            continue
+
+        if line in skip_exact:
+            continue
+        if any(s in line for s in skip_contains):
+            continue
+        if line.startswith(".") and line.endswith("{"):
+            continue
+        if line in {"{", "}"}:
+            continue
+        if ";" in line and ":" in line and not line.startswith("- "):
+            continue
+
         line = re.sub(r'^[-*+]\s*', '- ', line)
-        if line.startswith("<style"):
-            continue
+        line = re.sub(r'\n{2,}', '\n', line)
         cleaned_lines.append(line)
 
-    if not cleaned_lines:
+    cleaned = "\n".join(cleaned_lines).strip()
+    cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+    return cleaned
+
+
+def _markdown_to_preview(markdown_text: str, max_chars: int = 1400) -> str:
+    cleaned = _clean_patch_markdown(markdown_text)
+    if not cleaned:
         return ""
 
     selected = []
     total_len = 0
-    for line in cleaned_lines:
-        if line in {"Patch Notes", "BROWSE", "RESOURCES", "We value your privacy"}:
-            continue
+    for line in cleaned.split("\n"):
         add_len = len(line) + 1
         if total_len + add_len > max_chars:
             break
         selected.append(line)
         total_len += add_len
-
-    preview = "\n".join(selected).strip()
-    preview = re.sub(r'\n{3,}', '\n\n', preview)
-    return preview
+    return "\n".join(selected).strip()
 
 TIER_MAP = {
     "bronze": "Bronze", "silver": "Silver", "gold": "Gold", "diamond": "Diamond",
@@ -350,7 +383,7 @@ CONFIG_KEY_MAP = {
 }
 
 
-@register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、事件、阵容、更新公告、物品评级查询，图片卡片展示，AI 人格预设与工具自动调用", "v1.1.4")
+@register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、事件、阵容、更新公告、物品评级查询，图片卡片展示，AI 人格预设与工具自动调用", "v1.1.5")
 class BazaarPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
@@ -486,6 +519,7 @@ class BazaarPlugin(Star):
 
             if not hero_name:
                 hero_name = self._resolve_hero_name(search_term)
+
                 if hero_name:
                     item_tokens = []
 
@@ -2725,8 +2759,9 @@ class BazaarPlugin(Star):
 
             title_match = re.search(r'^##\s+(.+)$', markdown_text, flags=re.MULTILINE)
             title = title_match.group(1).strip() if title_match else f"补丁 {zh_entry.get('version', '')}"
-            preview = _markdown_to_preview(markdown_text)
-            if not preview:
+            body = _clean_patch_markdown(markdown_text)
+            preview = _markdown_to_preview(body)
+            if not body:
                 return None
 
             return {
@@ -2734,6 +2769,7 @@ class BazaarPlugin(Star):
                 "date": str(zh_entry.get("date", "")).strip(),
                 "title": title,
                 "url": patch_url,
+                "body": body,
                 "preview": preview,
                 "source": PATCH_NOTES_SOURCE_URL,
             }
@@ -2808,15 +2844,63 @@ class BazaarPlugin(Star):
                 yield event.plain_result("❌ 暂时无法获取中文补丁说明，请稍后再试。")
             return
 
-        preview = patch_notes_cn["preview"][:1800]
-        yield event.plain_result(
+        body = patch_notes_cn.get("body", "")
+        try:
+            card_images = await self.renderer.render_patch_cards(
+                patch_notes_cn["title"],
+                patch_notes_cn["date"],
+                patch_notes_cn["version"],
+                body,
+                patch_notes_cn["url"],
+            )
+            if len(card_images) == 1:
+                yield event.chain_result([Comp.Image.fromBytes(card_images[0])])
+                return
+
+            nodes = [Comp.Node(
+                name="大巴扎小助手", uin="0",
+                content=[Comp.Plain(
+                    f"🧩 {patch_notes_cn['title']}\n"
+                    f"📅 {patch_notes_cn['date']} | 版本 {patch_notes_cn['version']}\n"
+                    f"📄 共 {len(card_images)} 张补丁卡片"
+                )]
+            )]
+            for i, img in enumerate(card_images, 1):
+                nodes.append(Comp.Node(
+                    name="大巴扎小助手", uin="0",
+                    content=[
+                        Comp.Image.fromBytes(img),
+                        Comp.Plain(f"━━ 补丁正文 {i}/{len(card_images)} ━━")
+                    ]
+                ))
+            nodes.append(Comp.Node(
+                name="大巴扎小助手", uin="0",
+                content=[Comp.Plain(
+                    f"🔗 官方补丁页: {patch_notes_cn['source']}\n"
+                    f"🔗 中文文档: {patch_notes_cn['url']}"
+                )]
+            ))
+            yield event.chain_result([Comp.Nodes(nodes)])
+            return
+        except Exception as e:
+            logger.warning(f"补丁卡片渲染失败，回退文本: {e}")
+
+        header = (
             f"🧩 {patch_notes_cn['title']}\n"
             f"📅 {patch_notes_cn['date']}\n"
-            f"🏷️ 版本: {patch_notes_cn['version']}\n\n"
-            f"{preview}\n\n"
-            f"🔗 官方补丁页: {patch_notes_cn['source']}\n"
+            f"🏷️ 版本: {patch_notes_cn['version']}\n"
             f"🔗 中文文档: {patch_notes_cn['url']}"
         )
+        yield event.plain_result(header)
+
+        chunk_size = 1500
+        text_body = body or patch_notes_cn.get("preview", "")
+        total = max(1, (len(text_body) + chunk_size - 1) // chunk_size)
+        for i in range(total):
+            chunk = text_body[i * chunk_size:(i + 1) * chunk_size]
+            yield event.plain_result(f"📄 补丁正文 {i + 1}/{total}\n\n{chunk}")
+
+        yield event.plain_result(f"🔗 官方补丁页: {patch_notes_cn['source']}")
 
     @filter.command("tbznews")
     async def cmd_news(self, event: AstrMessageEvent):
