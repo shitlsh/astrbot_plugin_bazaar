@@ -3011,17 +3011,24 @@ class BazaarPlugin(Star):
             card_images = await self._get_patch_card_images(patch_notes_cn)
             sections = patch_notes_cn.get("sections") or _split_patch_sections(patch_notes_cn.get("body", ""))
             page_labels = self.renderer.describe_patch_pages(sections)
-            nodes = []
+            nodes = [Comp.Node(
+                name="大巴扎小助手", uin="0",
+                content=[Comp.Plain(
+                    f"🧩 {patch_notes_cn['title']}\n"
+                    f"📅 {patch_notes_cn['date']} | 版本 {patch_notes_cn['version']}\n"
+                    f"📄 共 {len(card_images)} 张补丁卡片"
+                )]
+            )]
             for i, img in enumerate(card_images, 1):
                 label = page_labels[i - 1] if i - 1 < len(page_labels) else f"{i}/{len(card_images)} 补丁"
                 nodes.append(Comp.Node(
                     name="大巴扎小助手", uin="0",
                     content=[
-                        Comp.Image.fromBytes(img),
                         Comp.Plain(label),
+                        Comp.Image.fromBytes(img),
                     ]
                 ))
-            if not nodes:
+            if len(nodes) <= 1:
                 yield event.plain_result("❌ 补丁卡片为空，请稍后再试。")
                 return
             yield event.chain_result([Comp.Nodes(nodes)])
@@ -3078,8 +3085,8 @@ class BazaarPlugin(Star):
                         patch_nodes.append(Comp.Node(
                             name="大巴扎小助手", uin="0",
                             content=[
-                                Comp.Image.fromBytes(img),
                                 Comp.Plain(label),
+                                Comp.Image.fromBytes(img),
                             ]
                         ))
                     if patch_nodes:
@@ -3126,8 +3133,8 @@ class BazaarPlugin(Star):
                     nodes.append(Comp.Node(
                         name="大巴扎小助手", uin="0",
                         content=[
-                            Comp.Image.fromBytes(img),
                             Comp.Plain(label),
+                            Comp.Image.fromBytes(img),
                         ]
                     ))
             except Exception as e:

@@ -983,15 +983,14 @@ class CardRenderer:
             y = header_h + PADDING + SECTION_GAP
             for line in chunk_lines:
                 stripped = line.strip()
-                display_text = stripped.replace("**", "").replace("__", "")
                 if stripped.startswith("### "):
-                    draw.text((PADDING + INDENT, y), display_text[4:], font=font_subtitle, fill=COLORS["orange"])
+                    draw.text((PADDING + INDENT, y), stripped[4:], font=font_subtitle, fill=COLORS["orange"])
                 elif stripped.startswith("## "):
-                    draw.text((PADDING + INDENT, y), display_text[3:], font=font_subtitle, fill=COLORS["green"])
+                    draw.text((PADDING + INDENT, y), stripped[3:], font=font_subtitle, fill=COLORS["green"])
                 elif stripped.startswith("# "):
-                    draw.text((PADDING + INDENT, y), display_text[2:], font=font_subtitle, fill=COLORS["accent"])
+                    draw.text((PADDING + INDENT, y), stripped[2:], font=font_subtitle, fill=COLORS["accent"])
                 else:
-                    draw.text((PADDING + INDENT, y), display_text, font=font_body, fill=COLORS["text"])
+                    draw.text((PADDING + INDENT, y), stripped, font=font_body, fill=COLORS["text"])
                 y += LINE_HEIGHT_BODY
 
             y += SECTION_GAP
