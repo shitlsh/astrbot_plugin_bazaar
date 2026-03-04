@@ -243,6 +243,9 @@ DATA_FILES = {
 STEAM_NEWS_API = "https://store.steampowered.com/events/ajaxgetpartnereventspageable/"
 STEAM_APP_ID = 1617400
 DEFAULT_NEWS_COUNT = 1
+PATCH_NOTES_INDEX_URL = "https://playthebazaar.com/api/cdn/data/data/patch-notes.json"
+PATCH_NOTES_BASE_URL = "https://playthebazaar.com/api/cdn/data"
+PATCH_NOTES_SOURCE_URL = "https://playthebazaar.com/patch-notes"
 
 HERO_CN_MAP = {
     "Common": "通用", "Dooley": "杜利", "Jules": "朱尔斯",
@@ -271,6 +274,61 @@ def _strip_bbcode(text: str) -> str:
     text = re.sub(r'\n{3,}', '\n\n', text)
     return text.strip()
 
+
+def _extract_patch_notes_link(text: str) -> str | None:
+    if not text:
+        return None
+    match = re.search(r'https?://playthebazaar\.com/patch-notes[^\s\]\)]*', text, flags=re.IGNORECASE)
+    if match:
+        return match.group(0)
+    if re.search(r'playthebazaar\.com/patch-notes', text, flags=re.IGNORECASE):
+        return PATCH_NOTES_SOURCE_URL
+    return None
+
+
+def _markdown_to_preview(markdown_text: str, max_chars: int = 1400) -> str:
+    if not markdown_text:
+        return ""
+
+    text = markdown_text.replace("\r\n", "\n").replace("\r", "\n")
+    text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'</?(?:div|span|em|strong|p|h1|h2|h3|h4|h5|h6)[^>]*>', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\[(.*?)\]\((https?://[^\)]+)\)', r'\1', text)
+    text = re.sub(r'`{1,3}', '', text)
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = re.sub(r'__(.*?)__', r'\1', text)
+
+    cleaned_lines = []
+    for raw_line in text.split("\n"):
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.startswith("<") and line.endswith(">"):
+            continue
+        line = re.sub(r'^#{1,6}\s*', '', line)
+        line = re.sub(r'^[-*+]\s*', '- ', line)
+        if line.startswith("<style"):
+            continue
+        cleaned_lines.append(line)
+
+    if not cleaned_lines:
+        return ""
+
+    selected = []
+    total_len = 0
+    for line in cleaned_lines:
+        if line in {"Patch Notes", "BROWSE", "RESOURCES", "We value your privacy"}:
+            continue
+        add_len = len(line) + 1
+        if total_len + add_len > max_chars:
+            break
+        selected.append(line)
+        total_len += add_len
+
+    preview = "\n".join(selected).strip()
+    preview = re.sub(r'\n{3,}', '\n\n', preview)
+    return preview
+
 TIER_MAP = {
     "bronze": "Bronze", "silver": "Silver", "gold": "Gold", "diamond": "Diamond",
     "铜": "Bronze", "青铜": "Bronze", "银": "Silver", "白银": "Silver",
@@ -292,7 +350,7 @@ CONFIG_KEY_MAP = {
 }
 
 
-@register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、事件、阵容、更新公告、物品评级查询，图片卡片展示，AI 人格预设与工具自动调用", "v1.1.2")
+@register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、事件、阵容、更新公告、物品评级查询，图片卡片展示，AI 人格预设与工具自动调用", "v1.1.4")
 class BazaarPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
@@ -1637,6 +1695,8 @@ class BazaarPlugin(Star):
             "  无参数: /tbzsearch (显示搜索帮助)\n\n"
             "/tbznews [数量] - 查询游戏官方更新公告(图片)\n"
             "  示例: /tbznews 或 /tbznews 3\n\n"
+            "/tbzpatch [版本号] - 查询中文补丁说明\n"
+            "  示例: /tbzpatch 或 /tbzpatch 11.0\n\n"
             "/tbzbuild <物品名> [数量] - 查询推荐阵容\n"
             "  示例: /tbzbuild 符文匕首\n\n"
             "/tbztier <英雄名> - 查询英雄物品评级(Tier List)\n"
@@ -2611,6 +2671,76 @@ class BazaarPlugin(Star):
             logger.debug(f"图片下载失败: {url}: {e}")
         return None
 
+    async def _fetch_latest_patch_notes_cn(self, version: str | None = None) -> dict | None:
+        target_version = (version or "").strip().lower().lstrip("v")
+
+        async def _fetch():
+            session = await self._get_session()
+            try:
+                async with session.get(PATCH_NOTES_INDEX_URL, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                    if resp.status != 200:
+                        logger.warning(f"补丁索引获取失败，HTTP {resp.status}")
+                        return None
+                    entries = await resp.json(content_type=None)
+            except Exception as e:
+                logger.warning(f"获取补丁索引失败: {e}")
+                return None
+
+            if not isinstance(entries, list):
+                return None
+
+            zh_entry = None
+            zh_path = ""
+            for entry in entries:
+                entry_version = str(entry.get("version", "")).strip().lower().lstrip("v")
+                if target_version and entry_version != target_version:
+                    continue
+
+                translations = entry.get("translations", {})
+                if not isinstance(translations, dict):
+                    continue
+                zh_path = translations.get("中文", "")
+                if not zh_path:
+                    for k, v in translations.items():
+                        if "zh" in str(v).lower() or "中文" in str(k):
+                            zh_path = v
+                            break
+                if zh_path:
+                    zh_entry = entry
+                    break
+
+            if not zh_entry or not zh_path:
+                return None
+
+            patch_url = zh_path if zh_path.startswith("http") else f"{PATCH_NOTES_BASE_URL}{zh_path}"
+            try:
+                async with session.get(patch_url, timeout=aiohttp.ClientTimeout(total=20)) as resp:
+                    if resp.status != 200:
+                        logger.warning(f"中文补丁文档获取失败，HTTP {resp.status}")
+                        return None
+                    markdown_text = await resp.text()
+            except Exception as e:
+                logger.warning(f"获取中文补丁文档失败: {e}")
+                return None
+
+            title_match = re.search(r'^##\s+(.+)$', markdown_text, flags=re.MULTILINE)
+            title = title_match.group(1).strip() if title_match else f"补丁 {zh_entry.get('version', '')}"
+            preview = _markdown_to_preview(markdown_text)
+            if not preview:
+                return None
+
+            return {
+                "version": str(zh_entry.get("version", "")).strip(),
+                "date": str(zh_entry.get("date", "")).strip(),
+                "title": title,
+                "url": patch_url,
+                "preview": preview,
+                "source": PATCH_NOTES_SOURCE_URL,
+            }
+
+        cache_ver = target_version or "latest"
+        return await self._cached_request(f"patch_notes:{cache_ver}:cn", CACHE_TTL_NEWS, _fetch)
+
     async def _fetch_news(self, count: int = 1) -> list:
         async def _fetch():
             session = await self._get_session()
@@ -2641,6 +2771,7 @@ class BazaarPlugin(Star):
                     title = announcement.get("headline", "")
                 body_bbcode = announcement.get("body", "")
                 body_text = _strip_bbcode(body_bbcode)
+                patch_notes_link = _extract_patch_notes_link(body_bbcode) or _extract_patch_notes_link(body_text)
                 post_time = ev_data.get("rtime32_start_time", 0)
                 date_str = datetime.utcfromtimestamp(post_time).strftime("%Y-%m-%d") if post_time else ""
                 url = f"https://store.steampowered.com/news/app/{STEAM_APP_ID}/view/{gid}?l=schinese"
@@ -2650,9 +2781,42 @@ class BazaarPlugin(Star):
                     "body": body_text,
                     "url": url,
                     "gid": gid,
+                    "patch_notes_link": patch_notes_link,
                 })
             return articles
         return await self._cached_request(f"news:{count}", CACHE_TTL_NEWS, _fetch)
+
+    @filter.command("tbzpatch")
+    async def cmd_patch(self, event: AstrMessageEvent):
+        """查询中文补丁说明（支持指定版本）"""
+        query = _extract_query(event.message_str, "tbzpatch")
+        version = query.strip() if query else ""
+        if version:
+            version = version.lower().lstrip("v")
+            yield event.plain_result(f"⏳ 正在获取官网中文补丁说明（版本 {version}）...")
+        else:
+            yield event.plain_result("⏳ 正在获取官网最新中文补丁说明...")
+
+        patch_notes_cn = await self._fetch_latest_patch_notes_cn(version or None)
+        if not patch_notes_cn:
+            if version:
+                yield event.plain_result(
+                    f"❌ 未找到版本 {version} 的中文补丁说明，或该版本暂未提供中文文档。\n"
+                    "💡 你可以先试试 /tbzpatch 获取最新版本。"
+                )
+            else:
+                yield event.plain_result("❌ 暂时无法获取中文补丁说明，请稍后再试。")
+            return
+
+        preview = patch_notes_cn["preview"][:1800]
+        yield event.plain_result(
+            f"🧩 {patch_notes_cn['title']}\n"
+            f"📅 {patch_notes_cn['date']}\n"
+            f"🏷️ 版本: {patch_notes_cn['version']}\n\n"
+            f"{preview}\n\n"
+            f"🔗 官方补丁页: {patch_notes_cn['source']}\n"
+            f"🔗 中文文档: {patch_notes_cn['url']}"
+        )
 
     @filter.command("tbznews")
     async def cmd_news(self, event: AstrMessageEvent):
@@ -2675,6 +2839,9 @@ class BazaarPlugin(Star):
             yield event.plain_result("❌ 暂时无法获取游戏更新公告，请稍后再试。")
             return
 
+        need_patch_notes = any(a.get("patch_notes_link") for a in articles)
+        patch_notes_cn = await self._fetch_latest_patch_notes_cn() if need_patch_notes else None
+
         if len(articles) == 1:
             article = articles[0]
             try:
@@ -2687,6 +2854,16 @@ class BazaarPlugin(Star):
                 preview = article["body"][:1000]
                 yield event.plain_result(
                     f"📰 {article['title']}\n📅 {article['date']}\n\n{preview}\n\n🔗 {article['url']}"
+                )
+            if patch_notes_cn:
+                patch_preview = patch_notes_cn["preview"][:1400]
+                yield event.plain_result(
+                    f"📌 公告提及官网补丁页，附上最新中文补丁摘要\n"
+                    f"🧩 {patch_notes_cn['title']}\n"
+                    f"📅 {patch_notes_cn['date']}\n\n"
+                    f"{patch_preview}\n\n"
+                    f"🔗 官方补丁页: {patch_notes_cn['source']}\n"
+                    f"🔗 中文文档: {patch_notes_cn['url']}"
                 )
             return
 
@@ -2717,6 +2894,20 @@ class BazaarPlugin(Star):
                         f"━━ {i}. {article['title']} ━━\n📅 {article['date']}\n\n{preview}\n\n🔗 {article['url']}"
                     )]
                 ))
+
+        if patch_notes_cn:
+            patch_preview = patch_notes_cn["preview"][:1600]
+            nodes.append(Comp.Node(
+                name="大巴扎小助手", uin="0",
+                content=[Comp.Plain(
+                    f"📌 公告提及官网补丁页，附上最新中文补丁摘要\n"
+                    f"🧩 {patch_notes_cn['title']}\n"
+                    f"📅 {patch_notes_cn['date']}\n\n"
+                    f"{patch_preview}\n\n"
+                    f"🔗 官方补丁页: {patch_notes_cn['source']}\n"
+                    f"🔗 中文文档: {patch_notes_cn['url']}"
+                )]
+            ))
 
         try:
             yield event.chain_result([Comp.Nodes(nodes)])
@@ -2979,6 +3170,9 @@ class BazaarPlugin(Star):
             yield event.plain_result("暂时无法获取游戏更新公告，请稍后再试。")
             return
 
+        need_patch_notes = any(a.get("patch_notes_link") for a in articles)
+        patch_notes_cn = await self._fetch_latest_patch_notes_cn() if need_patch_notes else None
+
         lines = []
         for i, article in enumerate(articles, 1):
             lines.append(f"{i}. {article['title']}")
@@ -2989,6 +3183,13 @@ class BazaarPlugin(Star):
             lines.append("")
 
         lines.append("💡 使用 /tbznews 查看完整图片版公告")
+        if patch_notes_cn:
+            lines.append("")
+            lines.append("📌 检测到公告提及官网 patch notes，附上最新中文补丁摘要：")
+            lines.append(f"🧩 {patch_notes_cn['title']} ({patch_notes_cn['date']})")
+            lines.append(patch_notes_cn["preview"][:1000])
+            lines.append(f"🔗 官方补丁页: {patch_notes_cn['source']}")
+            lines.append(f"🔗 中文文档: {patch_notes_cn['url']}")
         yield event.plain_result("\n".join(lines))
 
     @filter.llm_tool(name="bazaar_search")

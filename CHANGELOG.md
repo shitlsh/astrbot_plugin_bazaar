@@ -1,5 +1,28 @@
 # Changelog
 
+## v1.1.4
+
+### Features
+
+- `/tbzpatch` 新增可选版本参数：支持查询指定版本中文补丁
+  - 示例：`/tbzpatch 11.0` 或 `/tbzpatch v11.0`
+  - 无参数时仍返回最新中文补丁
+  - 指定版本未找到中文文档时，返回明确提示
+
+## v1.1.3
+
+### Features
+
+- 新增 `/tbzpatch` 命令：直接查询官网最新中文补丁说明
+  - 从 `https://playthebazaar.com/api/cdn/data/data/patch-notes.json` 读取版本索引
+  - 自动定位最新中文文档并提取摘要（`..._zh_CN.md`）
+  - 返回补丁标题、日期、版本号与官方链接
+
+### Improvements
+
+- `/tbznews` 增强：当 Steam 公告正文提及 `https://playthebazaar.com/patch-notes` 时，自动附加最新中文补丁摘要
+- README 文档补充 `/tbzpatch` 命令说明与官网补丁数据源说明
+
 ## v1.1.2
 
 ### Performance Optimizations
