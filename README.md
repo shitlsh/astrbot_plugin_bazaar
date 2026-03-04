@@ -154,7 +154,7 @@ sudo yum install wqy-zenhei-fonts
 - 默认显示 1 条最新公告，可在末尾指定数量（最多 20 条）
 - 多条公告以合并转发消息发送
 - 默认数量可在管理面板配置（`news_default_count`）
-- 当公告提及官网 Patch Notes 页面时，会自动附加最新中文补丁摘要
+- 当公告提及官网 Patch Notes 页面时，会自动附加中文补丁卡片（与 `/tbzpatch` 同一渲染逻辑）
 - 示例：`/tbznews` 或 `/tbznews 3`
 
 ### /tbzpatch 官网中文补丁
@@ -164,7 +164,9 @@ sudo yum install wqy-zenhei-fonts
 - 数据索引：`/api/cdn/data/data/patch-notes.json`
 - 中文正文：`/api/cdn/data/docs/pn/.../..._zh_CN.md`
 - 默认以图片卡片返回，正文过长会自动分成多张卡片（不截断）
+- 分段规则：优先按「通用更新 + 各英雄（杜利/朱尔斯/马克/皮格马利翁/斯黛拉/凡妮莎）」拆分为多张卡片
 - 自动清理官网文档里的样式/CSS/页脚等非正文噪音内容
+- 渲染结果会落盘到 `data/cache/patch_cards/`，按「版本号 + 正文哈希」命中复用，版本未变化时直接返回缓存图片
 - 无参数：返回最新中文补丁（`/tbzpatch`）
 - 带版本号：返回指定版本中文补丁（`/tbzpatch 11.0`，也支持 `v11.0`）
 
@@ -196,7 +198,7 @@ sudo yum install wqy-zenhei-fonts
 
 ## AI 工具集成
 
-插件注册了 10 个 AI 工具（`@llm_tool`），当 AstrBot 配置了支持函数调用的 LLM 后，AI 可以在对话中自动调用这些功能，无需用户手动输入指令：
+插件注册了 8 个 AI 工具（`@llm_tool`），当 AstrBot 配置了支持函数调用的 LLM 后，AI 可以在对话中自动调用这些功能，无需用户手动输入指令：
 
 | 工具名 | 功能 | 触发场景示例 |
 |--------|------|-------------|
@@ -206,7 +208,6 @@ sudo yum install wqy-zenhei-fonts
 | `bazaar_query_event` | 查询事件详情 | "奇异蘑菇事件怎么选？" |
 | `bazaar_search` | 多条件搜索 | "有哪些黄金武器？" |
 | `bazaar_query_build` | 查询推荐阵容 | "海盗船锚怎么搭配？" |
-| `bazaar_get_news` | 查询更新公告 | "最近更新了什么？" |
 | `bazaar_query_tierlist` | 查询英雄物品评级 | "海盗哪些物品好用？" |
 | `bazaar_query_merchant` | 查询商人/训练师 | "谁卖武器？" |
 

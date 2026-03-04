@@ -1,5 +1,6 @@
 import asyncio
 import inspect
+import hashlib
 import json
 import os
 import re
@@ -246,6 +247,7 @@ DEFAULT_NEWS_COUNT = 1
 PATCH_NOTES_INDEX_URL = "https://playthebazaar.com/api/cdn/data/data/patch-notes.json"
 PATCH_NOTES_BASE_URL = "https://playthebazaar.com/api/cdn/data"
 PATCH_NOTES_SOURCE_URL = "https://playthebazaar.com/patch-notes"
+PATCH_CARD_DISK_DIR = "patch_cards"
 
 HERO_CN_MAP = {
     "Common": "通用", "Dooley": "杜利", "Jules": "朱尔斯",
@@ -362,6 +364,61 @@ def _markdown_to_preview(markdown_text: str, max_chars: int = 1400) -> str:
         total_len += add_len
     return "\n".join(selected).strip()
 
+
+def _split_patch_sections(body: str) -> list[tuple[str, str]]:
+    if not body:
+        return []
+
+    hero_headers = {
+        "杜利", "朱尔斯", "马克", "皮格马利翁", "斯黛拉", "凡妮莎",
+        "DOOLEY", "JULES", "MAK", "PYGMALIEN", "STELLE", "VANESSA",
+    }
+
+    lines = body.split("\n")
+    common_lines: list[str] = []
+    sections: list[tuple[str, list[str]]] = []
+    current_name = ""
+    current_lines: list[str] = []
+
+    def _flush_current():
+        nonlocal current_name, current_lines
+        if current_name and any(l.strip() for l in current_lines):
+            sections.append((current_name, current_lines[:]))
+        current_name = ""
+        current_lines = []
+
+    for line in lines:
+        stripped = line.strip()
+        heading_match = re.match(r'^#{2,3}\s*(.+?)\s*$', stripped)
+        if heading_match:
+            heading_text = heading_match.group(1).strip()
+            if heading_text.upper() in hero_headers or heading_text in hero_headers:
+                _flush_current()
+                current_name = heading_text
+                current_lines = [f"### {heading_text}"]
+                continue
+
+        if current_name:
+            current_lines.append(line)
+        else:
+            common_lines.append(line)
+
+    _flush_current()
+
+    result: list[tuple[str, str]] = []
+    common_text = "\n".join(common_lines).strip()
+    if common_text:
+        result.append(("通用更新", common_text))
+
+    for name, slines in sections:
+        text = "\n".join(slines).strip()
+        if text:
+            result.append((name, text))
+
+    if not result:
+        result.append(("补丁更新", body.strip()))
+    return result
+
 TIER_MAP = {
     "bronze": "Bronze", "silver": "Silver", "gold": "Gold", "diamond": "Diamond",
     "铜": "Bronze", "青铜": "Bronze", "银": "Silver", "白银": "Silver",
@@ -383,7 +440,7 @@ CONFIG_KEY_MAP = {
 }
 
 
-@register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、事件、阵容、更新公告、物品评级查询，图片卡片展示，AI 人格预设与工具自动调用", "v1.1.5")
+@register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、事件、阵容、更新公告、物品评级查询，图片卡片展示，AI 人格预设与工具自动调用", "v1.1.6")
 class BazaarPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
@@ -453,6 +510,73 @@ class BazaarPlugin(Star):
     def _set_img_cache(self, key: str, data: bytes, ttl: int = CACHE_TTL_RENDER):
         """设置图片/渲染缓存"""
         self._cache.set(key, data, ttl)
+
+    def _get_patch_card_cache_dir(self) -> Path:
+        cache_dir = self.plugin_dir / "data" / "cache" / PATCH_CARD_DISK_DIR
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        return cache_dir
+
+    def _patch_card_cache_key(self, patch_notes_cn: dict) -> tuple[str, str]:
+        version = str(patch_notes_cn.get("version", "latest")).strip().lower().replace("/", "_")
+        body = patch_notes_cn.get("body", "")
+        body_hash = hashlib.sha1(body.encode("utf-8")).hexdigest()[:16]
+        key = f"patch_cards:{version}:{body_hash}"
+        prefix = f"{version}_{body_hash}"
+        return key, prefix
+
+    def _load_patch_cards_from_disk(self, prefix: str) -> list[bytes]:
+        cache_dir = self._get_patch_card_cache_dir()
+        files = sorted(cache_dir.glob(f"{prefix}_*.png"))
+        if not files:
+            return []
+        images: list[bytes] = []
+        for f in files:
+            try:
+                images.append(f.read_bytes())
+            except Exception:
+                return []
+        return images
+
+    def _save_patch_cards_to_disk(self, prefix: str, images: list[bytes]):
+        if not images:
+            return
+        cache_dir = self._get_patch_card_cache_dir()
+        for old in cache_dir.glob(f"{prefix}_*.png"):
+            try:
+                old.unlink()
+            except OSError:
+                pass
+        for i, img in enumerate(images, 1):
+            path = cache_dir / f"{prefix}_{i:02d}.png"
+            try:
+                path.write_bytes(img)
+            except Exception as e:
+                logger.debug(f"写入补丁卡片缓存失败: {path}: {e}")
+
+    async def _get_patch_card_images(self, patch_notes_cn: dict) -> list[bytes]:
+        cache_key, prefix = self._patch_card_cache_key(patch_notes_cn)
+
+        hit, cached = self._cache.get(cache_key)
+        if hit and isinstance(cached, list) and cached:
+            return cached
+
+        disk_images = self._load_patch_cards_from_disk(prefix)
+        if disk_images:
+            self._cache.set(cache_key, disk_images, CACHE_TTL_RENDER)
+            return disk_images
+
+        sections = _split_patch_sections(patch_notes_cn.get("body", ""))
+        images = await self.renderer.render_patch_cards(
+            patch_notes_cn["title"],
+            patch_notes_cn["date"],
+            patch_notes_cn["version"],
+            sections,
+            patch_notes_cn["url"],
+        )
+        if images:
+            self._save_patch_cards_to_disk(prefix, images)
+            self._cache.set(cache_key, images, CACHE_TTL_RENDER)
+        return images
 
     def _resolve_hero_name(self, query: str) -> str | None:
         ql = query.strip().lower()
@@ -919,14 +1043,12 @@ class BazaarPlugin(Star):
             "- bazaar_query_event: 查询事件选项和奖励\n"
             "- bazaar_search: 多条件搜索物品/怪物/技能/事件\n"
             "- bazaar_query_build: 查询社区推荐阵容（来自 BazaarForge 和 bazaar-builds.net）\n"
-            "- bazaar_get_news: 查询游戏最近的更新公告/补丁说明\n"
             "- bazaar_query_tierlist: 查询英雄物品评级（Tier List，各物品使用率排名）\n"
             "- bazaar_query_merchant: 查询商人/训练师信息（出售内容、品质、可遇到英雄）\n\n"
             "重要规则：\n"
             "- 当用户提到任何可能是游戏内容的名词时（如物品名、怪物名、英雄名），优先使用工具查询，不要凭空编造信息\n"
             "- 当用户问「怎么搭配」「怎么玩」「推荐阵容」时，使用 bazaar_query_build 工具\n"
             "- 当用户问某个东西「是什么」「有什么效果」时，先用 bazaar_query_item 查询\n"
-            "- 当用户问「最近更新了什么」「有什么新补丁」「更新公告」时，使用 bazaar_get_news 工具\n"
             "- 当用户问「哪些物品好用」「物品推荐」「装备排名」「tier list」时，使用 bazaar_query_tierlist 工具\n"
             "- 当用户问「商人」「在哪买」「训练师」「谁卖武器」等问题时，使用 bazaar_query_merchant 工具\n"
             "- 工具返回的是纯文本信息。如果用户想看图片卡片，建议他们使用 /tbzitem、/tbzmonster、/tbzskill、/tbztier、/tbzmerchant 等命令\n"
@@ -947,7 +1069,6 @@ class BazaarPlugin(Star):
             "bazaar_query_event",
             "bazaar_search",
             "bazaar_query_build",
-            "bazaar_get_news",
             "bazaar_query_tierlist",
             "bazaar_query_merchant",
         ]
@@ -2844,15 +2965,8 @@ class BazaarPlugin(Star):
                 yield event.plain_result("❌ 暂时无法获取中文补丁说明，请稍后再试。")
             return
 
-        body = patch_notes_cn.get("body", "")
         try:
-            card_images = await self.renderer.render_patch_cards(
-                patch_notes_cn["title"],
-                patch_notes_cn["date"],
-                patch_notes_cn["version"],
-                body,
-                patch_notes_cn["url"],
-            )
+            card_images = await self._get_patch_card_images(patch_notes_cn)
             if len(card_images) == 1:
                 yield event.chain_result([Comp.Image.fromBytes(card_images[0])])
                 return
@@ -2885,6 +2999,7 @@ class BazaarPlugin(Star):
         except Exception as e:
             logger.warning(f"补丁卡片渲染失败，回退文本: {e}")
 
+        body = patch_notes_cn.get("body", "")
         header = (
             f"🧩 {patch_notes_cn['title']}\n"
             f"📅 {patch_notes_cn['date']}\n"
@@ -2940,15 +3055,42 @@ class BazaarPlugin(Star):
                     f"📰 {article['title']}\n📅 {article['date']}\n\n{preview}\n\n🔗 {article['url']}"
                 )
             if patch_notes_cn:
-                patch_preview = patch_notes_cn["preview"][:1400]
-                yield event.plain_result(
-                    f"📌 公告提及官网补丁页，附上最新中文补丁摘要\n"
-                    f"🧩 {patch_notes_cn['title']}\n"
-                    f"📅 {patch_notes_cn['date']}\n\n"
-                    f"{patch_preview}\n\n"
-                    f"🔗 官方补丁页: {patch_notes_cn['source']}\n"
-                    f"🔗 中文文档: {patch_notes_cn['url']}"
-                )
+                try:
+                    patch_images = await self._get_patch_card_images(patch_notes_cn)
+                    patch_nodes = [Comp.Node(
+                        name="大巴扎小助手", uin="0",
+                        content=[Comp.Plain(
+                            f"📌 公告提及官网补丁页，附上中文补丁卡片\n"
+                            f"🧩 {patch_notes_cn['title']} ({patch_notes_cn['date']})"
+                        )]
+                    )]
+                    for i, img in enumerate(patch_images, 1):
+                        patch_nodes.append(Comp.Node(
+                            name="大巴扎小助手", uin="0",
+                            content=[
+                                Comp.Image.fromBytes(img),
+                                Comp.Plain(f"━━ 补丁卡片 {i}/{len(patch_images)} ━━"),
+                            ]
+                        ))
+                    patch_nodes.append(Comp.Node(
+                        name="大巴扎小助手", uin="0",
+                        content=[Comp.Plain(
+                            f"🔗 官方补丁页: {patch_notes_cn['source']}\n"
+                            f"🔗 中文文档: {patch_notes_cn['url']}"
+                        )]
+                    ))
+                    yield event.chain_result([Comp.Nodes(patch_nodes)])
+                except Exception as e:
+                    logger.warning(f"tbznews 补丁卡片发送失败，回退摘要: {e}")
+                    patch_preview = patch_notes_cn["preview"][:1400]
+                    yield event.plain_result(
+                        f"📌 公告提及官网补丁页，附上最新中文补丁摘要\n"
+                        f"🧩 {patch_notes_cn['title']}\n"
+                        f"📅 {patch_notes_cn['date']}\n\n"
+                        f"{patch_preview}\n\n"
+                        f"🔗 官方补丁页: {patch_notes_cn['source']}\n"
+                        f"🔗 中文文档: {patch_notes_cn['url']}"
+                    )
             return
 
         nodes = []
@@ -2980,18 +3122,44 @@ class BazaarPlugin(Star):
                 ))
 
         if patch_notes_cn:
-            patch_preview = patch_notes_cn["preview"][:1600]
-            nodes.append(Comp.Node(
-                name="大巴扎小助手", uin="0",
-                content=[Comp.Plain(
-                    f"📌 公告提及官网补丁页，附上最新中文补丁摘要\n"
-                    f"🧩 {patch_notes_cn['title']}\n"
-                    f"📅 {patch_notes_cn['date']}\n\n"
-                    f"{patch_preview}\n\n"
-                    f"🔗 官方补丁页: {patch_notes_cn['source']}\n"
-                    f"🔗 中文文档: {patch_notes_cn['url']}"
-                )]
-            ))
+            try:
+                patch_images = await self._get_patch_card_images(patch_notes_cn)
+                nodes.append(Comp.Node(
+                    name="大巴扎小助手", uin="0",
+                    content=[Comp.Plain(
+                        f"📌 公告提及官网补丁页，附上中文补丁卡片\n"
+                        f"🧩 {patch_notes_cn['title']} ({patch_notes_cn['date']})"
+                    )]
+                ))
+                for i, img in enumerate(patch_images, 1):
+                    nodes.append(Comp.Node(
+                        name="大巴扎小助手", uin="0",
+                        content=[
+                            Comp.Image.fromBytes(img),
+                            Comp.Plain(f"━━ 补丁卡片 {i}/{len(patch_images)} ━━"),
+                        ]
+                    ))
+                nodes.append(Comp.Node(
+                    name="大巴扎小助手", uin="0",
+                    content=[Comp.Plain(
+                        f"🔗 官方补丁页: {patch_notes_cn['source']}\n"
+                        f"🔗 中文文档: {patch_notes_cn['url']}"
+                    )]
+                ))
+            except Exception as e:
+                logger.warning(f"tbznews 补丁卡片发送失败，回退摘要: {e}")
+                patch_preview = patch_notes_cn["preview"][:1600]
+                nodes.append(Comp.Node(
+                    name="大巴扎小助手", uin="0",
+                    content=[Comp.Plain(
+                        f"📌 公告提及官网补丁页，附上最新中文补丁摘要\n"
+                        f"🧩 {patch_notes_cn['title']}\n"
+                        f"📅 {patch_notes_cn['date']}\n\n"
+                        f"{patch_preview}\n\n"
+                        f"🔗 官方补丁页: {patch_notes_cn['source']}\n"
+                        f"🔗 中文文档: {patch_notes_cn['url']}"
+                    )]
+                ))
 
         try:
             yield event.chain_result([Comp.Nodes(nodes)])
@@ -3240,41 +3408,6 @@ class BazaarPlugin(Star):
         info = self._format_event_info(found)
         info += "\n💡 使用 /tbzevent " + (found.get("name") or found.get("name_en", "")) + " 查看详情"
         yield event.plain_result(info)
-
-    @filter.llm_tool(name="bazaar_get_news")
-    async def tool_get_news(self, event: AstrMessageEvent, count: int = 1):
-        '''查询 The Bazaar (大巴扎) 游戏的最新官方更新公告和补丁说明。当用户询问游戏最近更新了什么、有什么新补丁、改动内容、版本更新、changelog 时，请调用此工具。返回 Steam 官方中文翻译的更新公告摘要。
-
-        Args:
-            count(int): 返回公告数量，默认1，范围1-5
-        '''
-        count = max(1, min(count, 5))
-        articles = await self._fetch_news(count)
-        if not articles:
-            yield event.plain_result("暂时无法获取游戏更新公告，请稍后再试。")
-            return
-
-        need_patch_notes = any(a.get("patch_notes_link") for a in articles)
-        patch_notes_cn = await self._fetch_latest_patch_notes_cn() if need_patch_notes else None
-
-        lines = []
-        for i, article in enumerate(articles, 1):
-            lines.append(f"{i}. {article['title']}")
-            lines.append(f"   日期: {article['date']}")
-            body_preview = article['body'][:500]
-            lines.append(f"   内容摘要:\n{body_preview}")
-            lines.append(f"   链接: {article['url']}")
-            lines.append("")
-
-        lines.append("💡 使用 /tbznews 查看完整图片版公告")
-        if patch_notes_cn:
-            lines.append("")
-            lines.append("📌 检测到公告提及官网 patch notes，附上最新中文补丁摘要：")
-            lines.append(f"🧩 {patch_notes_cn['title']} ({patch_notes_cn['date']})")
-            lines.append(patch_notes_cn["preview"][:1000])
-            lines.append(f"🔗 官方补丁页: {patch_notes_cn['source']}")
-            lines.append(f"🔗 中文文档: {patch_notes_cn['url']}")
-        yield event.plain_result("\n".join(lines))
 
     @filter.llm_tool(name="bazaar_search")
     async def tool_search(self, event: AstrMessageEvent, query: str):

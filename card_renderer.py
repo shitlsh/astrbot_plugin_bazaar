@@ -914,7 +914,7 @@ class CardRenderer:
 
         return self._save_image(img)
 
-    async def render_patch_cards(self, title: str, date_str: str, version: str, body: str, url: str) -> list[bytes]:
+    async def render_patch_cards(self, title: str, date_str: str, version: str, sections: list[tuple[str, str]], url: str) -> list[bytes]:
         font_title = self._font(24 * SCALE)
         font_subtitle = self._font(FONT_SIZE_SUBTITLE)
         font_body = self._font(15 * SCALE)
@@ -925,16 +925,23 @@ class CardRenderer:
         content_width = card_width - PADDING * 2
         header_h = 80 * SCALE
 
-        lines = self._wrap_text(body or "", font_body, content_width - INDENT)
-        if not lines:
-            lines = ["(无正文内容)"]
-
+        normalized_sections = sections or [("补丁更新", "")]
         max_lines_per_card = 170
-        chunks = [lines[i:i + max_lines_per_card] for i in range(0, len(lines), max_lines_per_card)]
-        total_cards = len(chunks)
+
+        page_chunks: list[tuple[str, list[str]]] = []
+        for sec_name, sec_text in normalized_sections:
+            raw = sec_text or ""
+            sec_lines = self._wrap_text(raw, font_body, content_width - INDENT)
+            if not sec_lines:
+                sec_lines = ["(无正文内容)"]
+            chunks = [sec_lines[i:i + max_lines_per_card] for i in range(0, len(sec_lines), max_lines_per_card)]
+            for c in chunks:
+                page_chunks.append((sec_name, c))
+
+        total_cards = len(page_chunks)
 
         images: list[bytes] = []
-        for idx, chunk_lines in enumerate(chunks, 1):
+        for idx, (section_name, chunk_lines) in enumerate(page_chunks, 1):
             body_h = len(chunk_lines) * LINE_HEIGHT_BODY + SECTION_GAP
             footer_lines = self._wrap_text(url, font_link, content_width)
             footer_h = max(2, len(footer_lines[:2])) * LINE_HEIGHT_LINK + PADDING
@@ -954,7 +961,7 @@ class CardRenderer:
                 draw.text((PADDING, y + 4 * SCALE), tl, font=font_title, fill=COLORS["text"])
                 y += 30 * SCALE
 
-            meta = f"{date_str}  |  版本 {version}"
+            meta = f"{date_str}  |  版本 {version}  |  分段 {section_name}"
             draw.text((PADDING, y + 2 * SCALE), meta, font=font_small, fill=COLORS["text_dim"])
 
             y = header_h + PADDING + SECTION_GAP
