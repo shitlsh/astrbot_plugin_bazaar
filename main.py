@@ -155,7 +155,7 @@ CACHE_MAX_MEMORY_MB = 100     # 最大内存占用 MB
 
 # 一图流攻略
 GUIDE_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
-VALID_HEROES = ["Dooley", "Jules", "Mak", "Pygmalien", "Stelle", "Vanessa"]
+DEFAULT_HEROES = ["Dooley", "Jules", "Mak", "Pygmalien", "Stelle", "Vanessa"]
 
 TIER_LIST_THRESHOLDS = {"S": 15.0, "A": 8.0, "B": 3.0, "C": 0.0}
 
@@ -482,7 +482,7 @@ CONFIG_KEY_MAP = {
 }
 
 
-@register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、事件、阵容、更新公告、物品评级查询，图片卡片展示，AI 人格预设与工具自动调用", "v1.1.6")
+@register("astrbot_plugin_bazaar", "大巴扎小助手", "The Bazaar 游戏数据查询，支持怪物、物品、技能、事件、阵容、更新公告、物品评级查询，图片卡片展示，AI 人格预设与工具自动调用", "v1.1.7")
 class BazaarPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
@@ -493,6 +493,9 @@ class BazaarPlugin(Star):
         self.events = []
         self.merchants = []
         self.aliases: dict[str, dict[str, str]] = {}
+        self._hero_alias_map: dict[str, str] = {}
+        self._hero_cn_map: dict[str, str] = dict(HERO_CN_MAP)
+        self._valid_heroes: list[str] = list(DEFAULT_HEROES)
         self._entity_names: set = set()
         self.plugin_dir = Path(os.path.dirname(os.path.abspath(__file__)))
         self.renderer = None
@@ -622,11 +625,79 @@ class BazaarPlugin(Star):
 
     def _resolve_hero_name(self, query: str) -> str | None:
         ql = query.strip().lower()
-        hero_map = {**{k.lower(): v for k, v in HERO_EN_MAP.items()},
-                    **{v.lower(): v for v in HERO_EN_MAP.values()}}
+        hero_map = dict(self._hero_alias_map)
+        hero_map.update({k.lower(): v for k, v in HERO_EN_MAP.items()})
+        hero_map.update({v.lower(): v for v in HERO_EN_MAP.values()})
+        hero_map.update({h.lower(): h for h in self._valid_heroes})
         for alias, target in self.aliases.get("hero", {}).items():
             hero_map[alias.lower()] = target
         return hero_map.get(ql)
+
+    def _is_latin_hero_token(self, token: str) -> bool:
+        if not token:
+            return False
+        return bool(re.fullmatch(r"[A-Za-z][A-Za-z\s'\-]*", token.strip()))
+
+    def _extract_heroes_from_field(self, raw: str) -> set[str]:
+        heroes = set()
+        if not raw:
+            return heroes
+        for chunk in str(raw).split("|"):
+            chunk = chunk.strip()
+            if not chunk:
+                continue
+            for part in chunk.split("/"):
+                token = part.strip()
+                if not token:
+                    continue
+                if " | " in token:
+                    token = token.split(" | ")[0].strip()
+                if self._is_latin_hero_token(token):
+                    heroes.add(token)
+        return heroes
+
+    def _refresh_hero_metadata(self):
+        valid_heroes = set(DEFAULT_HEROES)
+        cn_map = dict(HERO_CN_MAP)
+        alias_map = {k.lower(): v for k, v in HERO_EN_MAP.items()}
+        alias_map.update({v.lower(): v for v in HERO_EN_MAP.values()})
+
+        for dataset, field in ((self.items, "heroes"), (self.skills, "heroes")):
+            for entry in dataset:
+                raw = str(entry.get(field, "") or "")
+                for hero_en in self._extract_heroes_from_field(raw):
+                    valid_heroes.add(hero_en)
+                    alias_map[hero_en.lower()] = hero_en
+
+                hero_en, hero_cn = _clean_bilingual(raw)
+                if self._is_latin_hero_token(hero_en):
+                    valid_heroes.add(hero_en)
+                    alias_map[hero_en.lower()] = hero_en
+                    if hero_cn:
+                        cn_map[hero_en] = hero_cn
+                        alias_map[hero_cn.lower()] = hero_en
+
+        for ev in self.events:
+            for hero in ev.get("heroes", []) or []:
+                if self._is_latin_hero_token(hero):
+                    valid_heroes.add(hero)
+                    alias_map[hero.lower()] = hero
+
+        for merchant in self.merchants:
+            for hero in merchant.get("heroes", []) or []:
+                if self._is_latin_hero_token(hero):
+                    valid_heroes.add(hero)
+                    alias_map[hero.lower()] = hero
+
+        self._valid_heroes = sorted(valid_heroes)
+        self._hero_alias_map = alias_map
+        self._hero_cn_map = cn_map
+
+    def _hero_options_text(self, include_common: bool = False) -> str:
+        heroes = self._valid_heroes
+        if not include_common:
+            heroes = [h for h in heroes if h != "Common"]
+        return " | ".join(f"{self._hero_cn_map.get(h, h)}({h})" for h in heroes)
 
     async def _forge_get_item_uuids(self, search_term: str) -> list[str]:
         async def _fetch():
@@ -782,7 +853,7 @@ class BazaarPlugin(Star):
             level = b.get("level", 0)
             max_hp = b.get("max_health", 0)
             hero = b.get("hero", "")
-            hero_cn = HERO_CN_MAP.get(hero, hero)
+            hero_cn = self._hero_cn_map.get(hero, hero)
 
             excerpt_parts = []
             if hero:
@@ -1071,6 +1142,7 @@ class BazaarPlugin(Star):
 
     async def _register_persona(self):
         PERSONA_ID = "bazaar_helper"
+        hero_hint = self._hero_options_text()
         SYSTEM_PROMPT = (
             "你是「大巴扎小助手」，一个专门为 The Bazaar (大巴扎) 卡牌游戏提供帮助的 AI 助手。\n"
             "The Bazaar 是由 Tempo Storm 开发的 Roguelike 卡牌对战游戏（也叫大巴扎、巴扎）。\n\n"
@@ -1096,7 +1168,7 @@ class BazaarPlugin(Star):
             "- 工具返回的是纯文本信息。如果用户想看图片卡片，建议他们使用 /tbzitem、/tbzmonster、/tbzskill、/tbztier、/tbzmerchant 等命令\n"
             "- 在回复中整合工具返回的数据，并在末尾告知用户可以使用对应命令查看图片版本\n"
             "- 用中文回复玩家，语气友好专业\n"
-            "- 游戏中的英雄包括：Dooley(杜利/鸡煲)、Jules(朱尔斯/厨子)、Mak(马克)、Pygmalien(皮格马利翁/猪猪)、Stelle(斯黛拉/黑妹)、Vanessa(瓦妮莎/海盗) 等\n"
+            f"- 游戏中的英雄包括：{hero_hint} 等\n"
             "- 物品品质分为：Bronze(铜/青铜)、Silver(银)、Gold(金/黄金)、Diamond(钻石)\n"
             "- 物品有不同尺寸：Small(小型)、Medium(中型)、Large(大型)"
         )
@@ -1176,6 +1248,9 @@ class BazaarPlugin(Star):
         for k, v in TIER_MAP.items():
             if len(k) >= 2:
                 vocab[k] = ("tier", v)
+        for alias, target in self._hero_alias_map.items():
+            if len(alias) >= 2:
+                vocab[alias] = ("hero", target)
         tier_cn_to_en = {"青铜": "Bronze", "白银": "Silver", "黄金": "Gold", "钻石": "Diamond", "传奇": "Legendary"}
         for cn, en in tier_cn_to_en.items():
             vocab[cn] = ("tier", en)
@@ -1368,6 +1443,7 @@ class BazaarPlugin(Star):
                 setattr(self, attr, default)
 
         self._enrich_events(data_dir)
+        self._refresh_hero_metadata()
 
     def _enrich_events(self, data_dir: Path):
         enc_path = data_dir / "event_encounters.json"
@@ -1663,7 +1739,7 @@ class BazaarPlugin(Star):
 
         heroes = event_data.get("heroes", [])
         if heroes:
-            hero_display = ", ".join(f"{HERO_CN_MAP.get(h, h)}({h})" for h in heroes)
+            hero_display = ", ".join(f"{self._hero_cn_map.get(h, h)}({h})" for h in heroes)
             lines.append(f"🦸 适用英雄: {hero_display}")
             lines.append("")
 
@@ -1854,7 +1930,7 @@ class BazaarPlugin(Star):
         heroes = merchant.get("heroes", [])
         category_cn = "商人" if category == "Merchant" else "训练师" if category == "Trainer" else category
         tier_cn = {"Bronze": "青铜", "Silver": "白银", "Gold": "黄金", "Diamond": "钻石", "Legendary": "传说"}.get(tier, tier)
-        heroes_cn = [f"{HERO_CN_MAP.get(h, h)}" for h in heroes]
+        heroes_cn = [f"{self._hero_cn_map.get(h, h)}" for h in heroes]
         lines = [
             f"🏪 {name}",
             f"━━━━━━━━━━━━━━━━━━",
@@ -2106,8 +2182,8 @@ class BazaarPlugin(Star):
                 "",
                 "可用英雄:",
             ]
-            for hero_en in VALID_HEROES:
-                hero_cn = HERO_CN_MAP.get(hero_en, hero_en)
+            for hero_en in [h for h in self._valid_heroes if h != "Common"]:
+                hero_cn = self._hero_cn_map.get(hero_en, hero_en)
                 local_dir = self.plugin_dir / "data" / "guides" / hero_en
                 count = 0
                 if local_dir.exists():
@@ -2130,19 +2206,20 @@ class BazaarPlugin(Star):
         
         if not hero_en:
             # 尝试直接匹配英文名
-            for h in VALID_HEROES:
+            for h in self._valid_heroes:
                 if h.lower() == query.lower():
                     hero_en = h
                     break
         
-        if not hero_en or hero_en not in VALID_HEROES:
+        valid_heroes = [h for h in self._valid_heroes if h != "Common"]
+        if not hero_en or hero_en not in valid_heroes:
             yield event.plain_result(
                 f"未识别英雄「{query}」。\n\n"
-                f"可用英雄: {', '.join(f'{HERO_CN_MAP.get(h, h)}({h})' for h in VALID_HEROES)}"
+                f"可用英雄: {', '.join(f'{self._hero_cn_map.get(h, h)}({h})' for h in valid_heroes)}"
             )
             return
         
-        hero_cn = HERO_CN_MAP.get(hero_en, hero_en)
+        hero_cn = self._hero_cn_map.get(hero_en, hero_en)
         yield event.plain_result(f"⏳ 正在获取 {hero_cn}({hero_en}) 的一图流攻略...")
         
         # 获取图片
@@ -2404,7 +2481,8 @@ class BazaarPlugin(Star):
                     normalized = TIER_MAP.get(value.lower(), value.capitalize())
                     conditions["tiers"].append(normalized)
                 elif prefix in ("hero", "英雄"):
-                    conditions["heroes"].append(value)
+                    resolved_hero = self._resolve_hero_name(value)
+                    conditions["heroes"].append(resolved_hero or value)
                 elif prefix in ("size", "尺寸"):
                     conditions["sizes"].append(value)
                 else:
@@ -2707,11 +2785,13 @@ class BazaarPlugin(Star):
             self._load_data()
             self._build_vocab()
 
+        hero_text = self._hero_options_text()
         summary = (
             f"📦 数据更新完成 ({success_count}/{total_sources})\n"
             + "\n".join(results) + "\n\n"
             f"📊 当前数据: {len(self.monsters)}怪物 | {len(self.items)}物品 | {len(self.skills)}技能 | "
-            f"{len(self.events)}事件 | {len(self.merchants)}商人"
+            f"{len(self.events)}事件 | {len(self.merchants)}商人\n"
+            f"🦸 识别英雄({len([h for h in self._valid_heroes if h != 'Common'])}): {hero_text}"
         )
         yield event.plain_result(summary)
 
@@ -3501,23 +3581,27 @@ class BazaarPlugin(Star):
                 "  /tbztier 海盗\n"
                 "  /tbztier Vanessa\n"
                 "  /tbztier 杜利\n\n"
-                "可用英雄: Dooley(杜利) | Jules(朱尔斯) | Mak(马克) | Pygmalien(皮格马利翁) | Stelle(斯黛拉) | Vanessa(瓦妮莎)"
+                f"可用英雄: {self._hero_options_text()}"
             )
             return
 
         query = self._resolve_alias(query)
         hero_en = self._resolve_hero_name(query)
+        valid_heroes = [h for h in self._valid_heroes if h != "Common"]
         if not hero_en:
-            hero_en = query.strip().capitalize()
-            valid_heroes = ["Dooley", "Jules", "Mak", "Pygmalien", "Stelle", "Vanessa"]
-            if hero_en not in valid_heroes:
+            candidate = query.strip()
+            for hero in valid_heroes:
+                if hero.lower() == candidate.lower():
+                    hero_en = hero
+                    break
+            if not hero_en:
                 yield event.plain_result(
                     f"未识别英雄「{query}」。\n\n"
-                    "可用英雄: Dooley(杜利) | Jules(朱尔斯) | Mak(马克) | Pygmalien(皮格马利翁) | Stelle(斯黛拉) | Vanessa(瓦妮莎)"
+                    f"可用英雄: {self._hero_options_text()}"
                 )
                 return
 
-        hero_cn = HERO_CN_MAP.get(hero_en, hero_en)
+        hero_cn = self._hero_cn_map.get(hero_en, hero_en)
 
         img_cache_key = f"img:tierlist:{hero_en}"
         cached_img = self._get_img_cache(img_cache_key, CACHE_TTL_TIERLIST)
@@ -3568,16 +3652,20 @@ class BazaarPlugin(Star):
         '''
         query = self._resolve_alias(hero_name)
         hero_en = self._resolve_hero_name(query)
+        valid_heroes = [h for h in self._valid_heroes if h != "Common"]
         if not hero_en:
-            hero_en = query.strip().capitalize()
-            valid_heroes = ["Dooley", "Jules", "Mak", "Pygmalien", "Stelle", "Vanessa"]
-            if hero_en not in valid_heroes:
+            candidate = query.strip()
+            for hero in valid_heroes:
+                if hero.lower() == candidate.lower():
+                    hero_en = hero
+                    break
+            if not hero_en:
                 yield event.plain_result(
-                    f"未识别英雄「{hero_name}」。可用英雄: Dooley(杜利), Jules(朱尔斯), Mak(马克), Pygmalien(皮格马利翁), Stelle(斯黛拉), Vanessa(瓦妮莎)"
+                    f"未识别英雄「{hero_name}」。可用英雄: {self._hero_options_text()}"
                 )
                 return
 
-        hero_cn = HERO_CN_MAP.get(hero_en, hero_en)
+        hero_cn = self._hero_cn_map.get(hero_en, hero_en)
         tier_items = await self._fetch_tierlist(hero_en)
 
         total = sum(len(v) for v in tier_items.values())

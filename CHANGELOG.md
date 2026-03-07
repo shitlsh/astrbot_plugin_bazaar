@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.1.7
+
+### Fixes
+
+- 修复 `/tbzupdate` 后新英雄无法被识别的问题：`/tbztier`、`/tbzguide`、`bazaar_query_tierlist` 不再使用硬编码英雄列表，改为从本地数据动态构建英雄集合
+- 英雄名解析增强：合并内置映射、别名配置、数据文件中的英雄字段（含中英文双语）进行统一识别
+- `/tbzsearch hero:...` 前缀现在会先走英雄解析，避免新英雄或别名输入时筛选失效
+
+### Improvements
+
+- `tbzupdate` 更新完成后会在摘要中展示“当前识别英雄列表”，便于确认新英雄是否已被插件纳入
+- AI 人格提示中的英雄列表改为动态生成，避免版本迭代后提示信息过时
+- 同步刷新数据快照：`items_db.json`、`skills_db.json`（以及其余数据源文件）
+
 ## v1.1.6
 
 ### Features
