@@ -1428,6 +1428,7 @@ class BazaarPlugin(Star):
 
         self._enrich_events(data_dir)
         self._refresh_hero_metadata()
+        self._load_aliases()
 
     def _enrich_events(self, data_dir: Path):
         enc_path = data_dir / "event_encounters.json"
