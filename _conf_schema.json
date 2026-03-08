@@ -5,7 +5,7 @@
     "hint": "JSON 格式，将社区昵称映射到游戏内英雄英文名。搜索和阵容查询时自动识别。",
     "editor_mode": true,
     "editor_language": "json",
-    "default": "{\n  \"猪猪\": \"Pygmalien\",\n  \"猪\": \"Pygmalien\",\n  \"猪哥\": \"Pygmalien\",\n  \"鸡煲\": \"Dooley\",\n  \"机宝\": \"Dooley\",\n  \"海盗\": \"Vanessa\",\n  \"海盗姐\": \"Vanessa\",\n  \"黑妹\": \"Stelle\",\n  \"厨子\": \"Jules\",\n  \"大厨\": \"Jules\",\n  \"厨师\": \"Jules\",\n  \"中立\": \"Common\",\n  \"通用\": \"Common\"\n}"
+    "default": "{\n  \"猪猪\": \"Pygmalien\",\n  \"猪\": \"Pygmalien\",\n  \"猪哥\": \"Pygmalien\",\n  \"鸡煲\": \"Dooley\",\n  \"机宝\": \"Dooley\",\n  \"海盗\": \"Vanessa\",\n  \"海盗姐\": \"Vanessa\",\n  \"黑妹\": \"Stelle\",\n  \"厨子\": \"Jules\",\n  \"大厨\": \"Jules\",\n  \"厨师\": \"Jules\",\n  \"猎人\": \"Karnok\",\n  \"中立\": \"Common\",\n  \"通用\": \"Common\"\n}"
   },
   "item_aliases": {
     "description": "物品别名",

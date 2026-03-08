@@ -657,37 +657,29 @@ class BazaarPlugin(Star):
         return heroes
 
     def _refresh_hero_metadata(self):
-        valid_heroes = set(DEFAULT_HEROES)
+        valid_heroes = set()
         cn_map = dict(HERO_CN_MAP)
         alias_map = {k.lower(): v for k, v in HERO_EN_MAP.items()}
         alias_map.update({v.lower(): v for v in HERO_EN_MAP.values()})
 
-        for dataset, field in ((self.items, "heroes"), (self.skills, "heroes")):
-            for entry in dataset:
-                raw = str(entry.get(field, "") or "")
-                for hero_en in self._extract_heroes_from_field(raw):
-                    valid_heroes.add(hero_en)
-                    alias_map[hero_en.lower()] = hero_en
+        # 仅从 skills_db.json 的 heroes 字段维护英雄集合，避免跨数据源噪声导致误识别。
+        for skill in self.skills:
+            raw = str(skill.get("heroes", "") or "")
+            for hero_en in self._extract_heroes_from_field(raw):
+                valid_heroes.add(hero_en)
+                alias_map[hero_en.lower()] = hero_en
 
-                hero_en, hero_cn = _clean_bilingual(raw)
-                if self._is_latin_hero_token(hero_en):
-                    valid_heroes.add(hero_en)
-                    alias_map[hero_en.lower()] = hero_en
-                    if hero_cn:
-                        cn_map[hero_en] = hero_cn
-                        alias_map[hero_cn.lower()] = hero_en
+            hero_en, hero_cn = _clean_bilingual(raw)
+            if self._is_latin_hero_token(hero_en):
+                valid_heroes.add(hero_en)
+                alias_map[hero_en.lower()] = hero_en
+                if hero_cn:
+                    cn_map[hero_en] = hero_cn
+                    alias_map[hero_cn.lower()] = hero_en
 
-        for ev in self.events:
-            for hero in ev.get("heroes", []) or []:
-                if self._is_latin_hero_token(hero):
-                    valid_heroes.add(hero)
-                    alias_map[hero.lower()] = hero
-
-        for merchant in self.merchants:
-            for hero in merchant.get("heroes", []) or []:
-                if self._is_latin_hero_token(hero):
-                    valid_heroes.add(hero)
-                    alias_map[hero.lower()] = hero
+        if not valid_heroes:
+            logger.warning("未从 skills_db heroes 字段提取到英雄，回退默认英雄列表")
+            valid_heroes.update(DEFAULT_HEROES)
 
         self._valid_heroes = sorted(valid_heroes)
         self._hero_alias_map = alias_map
