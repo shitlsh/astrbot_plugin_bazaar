@@ -638,47 +638,39 @@ class BazaarPlugin(Star):
             return False
         return bool(re.fullmatch(r"[A-Za-z][A-Za-z\s'\-]*", token.strip()))
 
-    def _extract_heroes_from_field(self, raw: str) -> set[str]:
-        heroes = set()
-        if not raw:
-            return heroes
-        for chunk in str(raw).split("|"):
-            chunk = chunk.strip()
-            if not chunk:
-                continue
-            for part in chunk.split("/"):
-                token = part.strip()
-                if not token:
-                    continue
-                if " | " in token:
-                    token = token.split(" | ")[0].strip()
-                if self._is_latin_hero_token(token):
-                    heroes.add(token)
-        return heroes
-
     def _refresh_hero_metadata(self):
         valid_heroes = set()
         cn_map = dict(HERO_CN_MAP)
         alias_map = {k.lower(): v for k, v in HERO_EN_MAP.items()}
         alias_map.update({v.lower(): v for v in HERO_EN_MAP.values()})
 
-        # 仅从 skills_db.json 的 heroes 字段维护英雄集合，避免跨数据源噪声导致误识别。
+        # 仅从 skills_db.json 的 heroes 字段维护英雄集合。
+        # 关键：排除包含多个英雄的字段（|表示多英雄列表），只提取单英雄字段。
         for skill in self.skills:
-            raw = str(skill.get("heroes", "") or "")
-            for hero_en in self._extract_heroes_from_field(raw):
-                valid_heroes.add(hero_en)
-                alias_map[hero_en.lower()] = hero_en
-
+            raw = str(skill.get("heroes", "") or "").strip()
+            
+            # 排除多英雄字段（包含 | 的字段通常是描述可用英雄列表，而非单一英雄的技能）
+            if "|" in raw:
+                continue
+            
+            # 仅处理单英雄字段
+            if not raw:
+                continue
+            
+            # 解析格式：支持 "EnglishName / 中文名" 或仅 "EnglishName"
             hero_en, hero_cn = _clean_bilingual(raw)
+            
+            # 仅提取英文 Latin token，排除 Common/通用 等非英雄字段
             if self._is_latin_hero_token(hero_en):
                 valid_heroes.add(hero_en)
                 alias_map[hero_en.lower()] = hero_en
+                # 如果有中文名，记录映射关系
                 if hero_cn:
                     cn_map[hero_en] = hero_cn
                     alias_map[hero_cn.lower()] = hero_en
 
         if not valid_heroes:
-            logger.warning("未从 skills_db heroes 字段提取到英雄，回退默认英雄列表")
+            logger.warning("未从 skills_db heroes 字段（单英雄字段）提取到英雄，回退默认英雄列表")
             valid_heroes.update(DEFAULT_HEROES)
 
         self._valid_heroes = sorted(valid_heroes)
