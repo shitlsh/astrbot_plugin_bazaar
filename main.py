@@ -1030,25 +1030,35 @@ class BazaarPlugin(Star):
 
     def _load_aliases(self):
         self.aliases = {}
+        # 首先从 data/aliases.json 加载文件中的别名
+        path = self.plugin_dir / "data" / "aliases.json"
+        file_aliases = {}
+        try:
+            if path.exists():
+                with open(path, "r", encoding="utf-8") as f:
+                    file_data = json.load(f)
+                for cat in ALIAS_CATEGORIES:
+                    file_aliases[cat] = file_data.get(cat, {})
+            else:
+                for cat in ALIAS_CATEGORIES:
+                    file_aliases[cat] = {}
+        except Exception as e:
+            logger.warning(f"加载别名文件失败: {e}")
+            for cat in ALIAS_CATEGORIES:
+                file_aliases[cat] = {}
+        
+        # 然后从配置系统加载（如果有配置），并与文件别名合并
         if self.config:
             for cat, config_key in CONFIG_KEY_MAP.items():
                 val = self.config.get(config_key, {})
-                self.aliases[cat] = self._parse_alias_value(val)
+                config_aliases = self._parse_alias_value(val)
+                # 合并：文件别名为基础，配置中的优先级更高
+                merged = dict(file_aliases.get(cat, {}))
+                merged.update(config_aliases)
+                self.aliases[cat] = merged
         else:
-            path = self.plugin_dir / "data" / "aliases.json"
-            try:
-                if path.exists():
-                    with open(path, "r", encoding="utf-8") as f:
-                        data = json.load(f)
-                    for cat in ALIAS_CATEGORIES:
-                        self.aliases[cat] = data.get(cat, {})
-                else:
-                    for cat in ALIAS_CATEGORIES:
-                        self.aliases[cat] = {}
-            except Exception as e:
-                logger.error(f"加载别名配置失败: {e}")
-                for cat in ALIAS_CATEGORIES:
-                    self.aliases[cat] = {}
+            # 如果无配置，直接使用文件别名
+            self.aliases = file_aliases
 
     def _save_aliases(self):
         if self.config:
